@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Сравнение отчётов — АнтиПлагиат{% endblock %}
+
+{% block head %}
+<style>
+.split-pane { height: calc(100vh - 220px); overflow-y: auto; }
+.chunk { padding: 6px 10px; margin-bottom: 4px; border-radius: 4px; font-size: 0.85rem; line-height: 1.5; }
+.chunk-match { background-color: #ffe0e0; border-left: 3px solid #dc3545; }
+.chunk-unique { background-color: #f8f9fa; border-left: 3px solid #dee2e6; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2">
+  <a href="/plagiarism/{{ report.id }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+  <div class="me-auto">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-layout-split me-2 text-danger"></i>Сравнение отчётов</h5>
+  </div>
+  <div class="d-flex gap-3 align-items-center">
+    <div class="text-center">
+      <span class="fs-4 fw-bold text-danger">{{ borrow_pct }}%</span>
+      <span class="text-muted small d-block">заимствований</span>
+    </div>
+    <div class="text-center">
+      <span class="fs-4 fw-bold text-success">{{ orig_pct }}%</span>
+      <span class="text-muted small d-block">оригинальность</span>
+    </div>
+  </div>
+</div>
+
+<div class="progress mb-3" style="height:12px">
+  <div class="progress-bar bg-success" style="width:{{ orig_pct }}%" title="Оригинально"></div>
+  <div class="progress-bar bg-danger" style="width:{{ borrow_pct }}%" title="Заимствовано"></div>
+</div>
+
+<div class="d-flex gap-4 mb-2 small">
+  <div><span class="badge bg-danger me-1">■</span> Совпадающий фрагмент</div>
+  <div><span class="badge bg-secondary me-1" style="opacity:0.5">■</span> Оригинальный фрагмент</div>
+</div>
+
+<div class="row g-0" style="border:1px solid #dee2e6; border-radius:8px; overflow:hidden">
+  <div class="col-6 border-end">
+    <div class="p-2 bg-light border-bottom fw-bold small text-truncate" title="{{ report.title }}">
+      <i class="bi bi-file-earmark-text me-1 text-primary"></i>
+      Текущий: {{ report.title }} <span class="text-muted fw-normal">({{ report.author }})</span>
+    </div>
+    <div class="split-pane p-2">
+      {% set hashes = shared_hashes %}
+      {% for chunk in report_chunks %}
+        <div class="chunk {% if chunk.hash in hashes %}chunk-match{% else %}chunk-unique{% endif %}">
+          {{ chunk.text }}
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="col-6">
+    <div class="p-2 bg-light border-bottom fw-bold small text-truncate" title="{{ source.title }}">
+      <i class="bi bi-file-earmark-text me-1 text-danger"></i>
+      Источник: {{ source.title }} <span class="text-muted fw-normal">({{ source.author }})</span>
+    </div>
+    <div class="split-pane p-2">
+      {% for chunk in source_chunks %}
+        <div class="chunk {% if chunk.hash in hashes %}chunk-match{% else %}chunk-unique{% endif %}">
+          {{ chunk.text }}
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const panes = document.querySelectorAll('.split-pane');
+panes.forEach((pane, i) => {
+  pane.addEventListener('scroll', () => {
+    panes.forEach((p, j) => { if (i !== j) p.scrollTop = pane.scrollTop; });
+  });
+});
+</script>
+{% endblock %}
