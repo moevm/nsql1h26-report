@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block title %}Граф отчёта — АнтиПлагиат{% endblock %}
+
+{% block head %}
+<style>
+#cy { width:100%; height:calc(100vh - 180px); background:#f8f9fa; border-radius:8px; }
+.legend-dot { width:14px;height:14px;border-radius:50%;display:inline-block }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2">
+  <a href="/reports/{{ report_id }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+  <div class="me-auto">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-diagram-3 me-2 text-info"></i>Граф отчёта</h5>
+    <small class="text-muted">{{ report_title }}</small>
+  </div>
+  <div class="d-flex gap-2">
+    <button onclick="cy.fit()" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrows-fullscreen me-1"></i>По размеру</button>
+    <button onclick="cy.reset()" class="btn btn-sm btn-outline-secondary"><i class="bi bi-house me-1"></i>Центр</button>
+    <button onclick="cy.zoom(cy.zoom()*1.2)" class="btn btn-sm btn-outline-secondary"><i class="bi bi-zoom-in"></i></button>
+    <button onclick="cy.zoom(cy.zoom()*0.8)" class="btn btn-sm btn-outline-secondary"><i class="bi bi-zoom-out"></i></button>
+  </div>
+</div>
+
+<div class="d-flex gap-3 mb-2 px-1">
+  <div class="d-flex align-items-center gap-1 small">
+    <span class="legend-dot" style="background:#0d6efd"></span> Документ
+  </div>
+  <div class="d-flex align-items-center gap-1 small">
+    <span class="legend-dot" style="background:#198754"></span> Раздел
+  </div>
+  <div class="d-flex align-items-center gap-1 small">
+    <span class="legend-dot" style="background:#6c757d"></span> Фрагмент
+  </div>
+  <div class="d-flex align-items-center gap-1 small">
+    <span class="legend-dot" style="background:#dc3545"></span> Заимствованный фрагмент
+  </div>
+</div>
+
+<div id="cy"></div>
+
+<div id="tooltip" class="card shadow position-fixed p-2 d-none" style="max-width:320px;z-index:9999;font-size:0.8rem"></div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
+<script>
+(async () => {
+  const res = await fetch('/graph/{{ report_id }}/data');
+  const {nodes, edges} = await res.json();
+
+  const cy = cytoscape({
+    container: document.getElementById('cy'),
+    elements: [...nodes, ...edges],
+    style: [
+      {
+        selector: 'node[type="Report"]',
+        style: {
+          'background-color': '#0d6efd',
+          'label': 'data(label)',
+          'color': '#fff',
+          'font-size': '11px',
+          'text-valign': 'center',
+          'text-halign': 'center',
+          'width': '100px',
+          'height': '100px',
+          'text-wrap': 'wrap',
+          'text-max-width': '88px',
+          'font-weight': 'bold',
+          'border-width': '4px',
+          'border-color': '#084298',
+          'z-index': 10,
+        }
+      },
+      {
+        selector: 'node[type="Part"]',
+        style: {
+          'background-color': '#198754',
+          'label': 'data(label)',
+          'color': '#fff',
+          'font-size': '10px',
+          'text-valign': 'center',
+          'text-halign': 'center',
+          'width': '72px',
+          'height': '72px',
+          'text-wrap': 'wrap',
+          'text-max-width': '64px',
+          'border-width': '3px',
+          'border-color': '#0f5132',
+          'z-index': 5,
+        }
+      },
+      {
+        selector: 'node[type="Chunk"]',
+        style: {
+          'background-color': '#6c757d',
+          'label': 'data(label)',
+          'color': '#fff',
+          'font-size': '7px',
+          'text-valign': 'center',
+          'text-halign': 'center',
+          'width': '48px',
+          'height': '48px',
+          'text-wrap': 'wrap',
+          'text-max-width': '42px',
+        }
+      },
+      {
+        selector: 'node[type="SharedChunk"]',
+        style: {
+          'background-color': '#dc3545',
+          'label': 'data(label)',
+          'color': '#fff',
+          'font-size': '7px',
+          'text-valign': 'center',
+          'text-halign': 'center',
+          'width': '54px',
+          'height': '54px',
+          'text-wrap': 'wrap',
+          'text-max-width': '46px',
+          'border-width': '3px',
+          'border-color': '#fff',
+          'box-shadow': '0 0 8px rgba(220,53,69,0.8)',
+        }
+      },
+      {
+        selector: 'edge',
+        style: {
+          'width': 2,
+          'line-color': '#adb5bd',
+          'target-arrow-color': '#adb5bd',
+          'target-arrow-shape': 'triangle',
+          'curve-style': 'bezier',
+          'opacity': 0.6,
+        }
+      },
+      {
+        selector: 'edge[label="HAS_PART"]',
+        style: {
+          'line-color': '#198754',
+          'target-arrow-color': '#198754',
+          'width': 2.5,
+          'opacity': 0.8,
+        }
+      },
+      {
+        selector: 'node:selected',
+        style: { 'border-width': 5, 'border-color': '#ffc107', 'z-index': 20 }
+      }
+    ],
+    layout: {
+      name: 'cose',
+      animate: true,
+      animationDuration: 800,
+      animationEasing: 'ease-out',
+      randomize: false,
+      componentSpacing: 80,
+      nodeRepulsion: () => 12000,
+      nodeOverlap: 20,
+      idealEdgeLength: () => 90,
+      edgeElasticity: () => 100,
+      nestingFactor: 1.2,
+      gravity: 60,
+      numIter: 1000,
+      initialTemp: 200,
+      coolingFactor: 0.99,
+      minTemp: 1.0,
+    }
+  });
+
+  window.cy = cy;
+
+  const tip = document.getElementById('tooltip');
+  cy.on('mouseover', 'node', evt => {
+    const node = evt.target;
+    const d = node.data();
+    tip.innerHTML = `<strong>${d.type}</strong><br><span class="text-muted">${d.full_label || d.label}</span>`;
+    tip.classList.remove('d-none');
+  });
+  cy.on('mousemove', evt => {
+    tip.style.left = (evt.originalEvent.clientX + 12) + 'px';
+    tip.style.top = (evt.originalEvent.clientY - 10) + 'px';
+  });
+  cy.on('mouseout', 'node', () => tip.classList.add('d-none'));
+  cy.on('tap', 'node', evt => {
+    const d = evt.target.data();
+    if (d.type === 'Report') window.open('/reports/{{ report_id }}', '_blank');
+  });
+})();
+</script>
+{% endblock %}
