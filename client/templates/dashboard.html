@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Главная — АнтиПлагиат{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h4 class="mb-0 fw-bold"><i class="bi bi-house me-2 text-primary"></i>Все отчёты</h4>
+    <small class="text-muted">Всего: {{ reports|length }} отчётов в базе</small>
+  </div>
+  <div class="d-flex gap-2">
+    {% if user.role == 'admin' %}
+    <a href="/import" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-cloud-upload me-1"></i>Массовый импорт
+    </a>
+    <a href="/export" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-download me-1"></i>Массовый экспорт
+    </a>
+    {% endif %}
+    <a href="/statistics/" class="btn btn-outline-info btn-sm">
+      <i class="bi bi-bar-chart me-1"></i>Статистика
+    </a>
+    <a href="/search/" class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-search me-1"></i>Поиск отчётов
+    </a>
+    <a href="/reports/new" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-lg me-1"></i>Добавить отчёт
+    </a>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0" id="reportsTable">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-3">№</th>
+            <th>Название отчёта</th>
+            <th>Автор</th>
+            <th>Предмет</th>
+            <th>Группа</th>
+            <th>Статус</th>
+            <th class="text-end">Слов</th>
+            <th class="text-end">Флеш</th>
+            <th class="text-end">Оригин. %</th>
+            <th>Дата загрузки</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in reports %}
+          <tr class="clickable-row" data-href="/reports/{{ r.id }}" style="cursor:pointer">
+            <td class="ps-3 text-muted">{{ loop.index }}</td>
+            <td class="fw-semibold text-truncate" style="max-width:220px" title="{{ r.title }}">{{ r.title }}</td>
+            <td class="text-muted small">{{ r.author }}</td>
+            <td class="small">{{ r.subject }}</td>
+            <td><span class="badge bg-secondary">{{ r.group }}</span></td>
+            <td>
+              {% if r.status == 'Готов' %}
+                <span class="badge bg-success">{{ r.status }}</span>
+              {% elif r.status == 'В обработке' %}
+                <span class="badge bg-warning text-dark">{{ r.status }}</span>
+              {% else %}
+                <span class="badge bg-danger">{{ r.status }}</span>
+              {% endif %}
+            </td>
+            <td class="text-end">{{ r.words_count or '—' }}</td>
+            <td class="text-end">{{ r.flesh_index or '—' }}</td>
+            <td class="text-end">
+              {% if r.originality is not none %}
+                {% set orig = r.originality|float %}
+                <span class="fw-semibold {% if orig < 50 %}text-danger{% elif orig < 75 %}text-warning{% else %}text-success{% endif %}">
+                  {{ orig }}%
+                </span>
+              {% else %}—{% endif %}
+            </td>
+            <td class="small text-muted">{{ r.upload_date_str }}</td>
+            <td>
+              <a href="/reports/{{ r.id }}" class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation()">
+                <i class="bi bi-eye"></i>
+              </a>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="11" class="text-center py-5 text-muted">
+              <i class="bi bi-inbox" style="font-size:2rem"></i>
+              <p class="mt-2">Отчётов нет. <a href="/reports/new">Добавить первый</a></p>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm mt-4">
+  <div class="card-body">
+    <h6 class="fw-bold mb-3"><i class="bi bi-upload me-2 text-primary"></i>Быстрая загрузка отчёта</h6>
+    <div id="quickDrop" class="drop-zone text-center py-4 rounded border-2 border-dashed">
+      <i class="bi bi-file-earmark-word text-muted" style="font-size:2rem"></i>
+      <p class="mt-2 text-muted mb-0">Перетащите .docx файл сюда или</p>
+      <a href="/reports/new" class="btn btn-sm btn-primary mt-2">Выбрать файл</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.clickable-row').forEach(row => {
+  row.addEventListener('click', () => window.location = row.dataset.href);
+});
+const dz = document.getElementById('quickDrop');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file && file.name.endsWith('.docx')) {
+    window.location = '/reports/new?filename=' + encodeURIComponent(file.name);
+  }
+});
+</script>
+{% endblock %}
