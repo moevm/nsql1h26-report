@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Студенты{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center mb-4">
+  <div class="me-auto">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-people me-2 text-primary"></i>Студенты</h5>
+    <small class="text-muted">{{ students|length }} студентов в базе</small>
+  </div>
+  <a href="/students/new" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Добавить студента</a>
+</div>
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th class="ps-3">ID</th>
+          <th>Фамилия</th>
+          <th>Имя</th>
+          <th>Группа</th>
+          <th class="text-end">Отчётов</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in students %}
+        <tr>
+          <td class="ps-3 text-muted">{{ s.id }}</td>
+          <td class="fw-semibold">{{ s.surname }}</td>
+          <td>{{ s.name }}</td>
+          <td><span class="badge bg-secondary">{{ s.group }}</span></td>
+          <td class="text-end">{{ s.report_count }}</td>
+          <td class="text-end">
+            <a href="/students/{{ s.id }}" class="btn btn-sm btn-outline-primary me-1"><i class="bi bi-eye"></i></a>
+            <a href="/students/{{ s.id }}/edit" class="btn btn-sm btn-outline-warning me-1"><i class="bi bi-pencil"></i></a>
+            <form method="post" action="/students/{{ s.id }}/delete" class="d-inline"
+                  onsubmit="return confirm('Удалить студента?')">
+              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center py-4 text-muted">Студентов нет. <a href="/students/new">Добавить</a></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

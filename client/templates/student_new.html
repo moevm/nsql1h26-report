@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Новый студент{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center mb-4 gap-2">
+  <a href="/students/" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+  <h5 class="mb-0 fw-bold"><i class="bi bi-person-plus me-2 text-primary"></i>Добавить студента</h5>
+</div>
+<div class="row justify-content-center">
+  <div class="col-lg-5">
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <form method="post" action="/students/new">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Фамилия <span class="text-danger">*</span></label>
+            <input name="surname" type="text" class="form-control" required placeholder="Иванов"/>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Имя <span class="text-danger">*</span></label>
+            <input name="name" type="text" class="form-control" required placeholder="Иван"/>
+          </div>
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Группа <span class="text-danger">*</span></label>
+            <input name="group" type="number" class="form-control" required placeholder="3341"/>
+          </div>
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary flex-fill"><i class="bi bi-check me-1"></i>Создать</button>
+            <a href="/students/" class="btn btn-outline-secondary">Отмена</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

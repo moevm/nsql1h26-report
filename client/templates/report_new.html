@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Новый отчёт{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center mb-4 gap-2">
+  <a href="/dashboard" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+  <h5 class="mb-0 fw-bold"><i class="bi bi-file-earmark-plus me-2 text-primary"></i>Добавить отчёт</h5>
+</div>
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <form method="post" action="/reports/upload" enctype="multipart/form-data">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Название отчёта <span class="text-danger">*</span></label>
+            <input name="title" type="text" class="form-control" required placeholder="Разработка CLI для обработки изображений"/>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-6">
+              <label class="form-label fw-semibold">Автор <span class="text-danger">*</span></label>
+              <input name="author" type="text" class="form-control" required placeholder="Иванов И.И."/>
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold">Группа <span class="text-danger">*</span></label>
+              <input name="group" type="number" class="form-control" required placeholder="3341" value="3341"/>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Предмет <span class="text-danger">*</span></label>
+            <input name="subject" type="text" class="form-control" required placeholder="Программирование"/>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Студент</label>
+            <select name="student_id" class="form-select">
+              <option value="">— Не привязывать —</option>
+              {% for s in students %}
+              <option value="{{ s.id }}">{{ s.surname }} {{ s.name }} (гр. {{ s.group }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Файл .docx</label>
+            <input name="file" type="file" accept=".docx" class="form-control"/>
+            <div class="form-text">Загрузите файл для автоматического парсинга текста. Или оставьте пустым для ручного добавления.</div>
+          </div>
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Комментарий</label>
+            <textarea name="comment" class="form-control" rows="2" placeholder="Дополнительные заметки..."></textarea>
+          </div>
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary flex-fill">
+              <i class="bi bi-check-lg me-1"></i>Добавить отчёт
+            </button>
+            <a href="/dashboard" class="btn btn-outline-secondary">Отмена</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

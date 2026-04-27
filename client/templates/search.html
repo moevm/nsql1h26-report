@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}Поиск отчётов{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+  <div class="col-lg-3">
+    <div class="card shadow-sm sticky-top" style="top:80px">
+      <div class="card-header bg-primary text-white fw-bold">
+        <i class="bi bi-funnel me-2"></i>Фильтры
+      </div>
+      <div class="card-body">
+        <form method="get" action="/search/" id="searchForm">
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Название документа</label>
+            <input name="title" type="text" class="form-control form-control-sm"
+                   placeholder="подстрока..." value="{{ params.get('title','') }}"/>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Автор</label>
+            <input name="author" type="text" class="form-control form-control-sm"
+                   placeholder="подстрока..." value="{{ params.get('author','') }}"/>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Группа</label>
+            <input name="group" type="number" class="form-control form-control-sm"
+                   placeholder="например 3341" value="{{ params.get('group','') }}"/>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Предмет</label>
+            <input name="subject" type="text" class="form-control form-control-sm"
+                   placeholder="подстрока..." value="{{ params.get('subject','') }}"/>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Статус</label>
+            <select name="status" class="form-select form-select-sm">
+              <option value="">— Любой —</option>
+              <option value="Готов" {% if params.get('status')=='Готов' %}selected{% endif %}>Готов</option>
+              <option value="В обработке" {% if params.get('status')=='В обработке' %}selected{% endif %}>В обработке</option>
+              <option value="Ошибка" {% if params.get('status')=='Ошибка' %}selected{% endif %}>Ошибка</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Содержит слово</label>
+            <input name="word" type="text" class="form-control form-control-sm"
+                   placeholder="поиск в тексте..." value="{{ params.get('word','') }}"/>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold d-flex justify-content-between">
+              <span>Мин. Индекс Флеша</span>
+              <span id="fleshVal">{{ params.get('min_flesh','0') }}</span>
+            </label>
+            <input name="min_flesh" type="range" class="form-range" min="0" max="100"
+                   value="{{ params.get('min_flesh','0') }}"
+                   oninput="document.getElementById('fleshVal').textContent=this.value"/>
+          </div>
+          <div class="mb-4">
+            <label class="form-label small fw-semibold d-flex justify-content-between">
+              <span>Мин. Оригинальность %</span>
+              <span id="origVal">{{ params.get('min_originality','0') }}</span>
+            </label>
+            <input name="min_originality" type="range" class="form-range" min="0" max="100"
+                   value="{{ params.get('min_originality','0') }}"
+                   oninput="document.getElementById('origVal').textContent=this.value"/>
+          </div>
+          <div class="d-grid gap-2">
+            <button type="submit" class="btn btn-primary btn-sm">
+              <i class="bi bi-search me-1"></i>Найти отчёты
+            </button>
+            <a href="/search/" class="btn btn-outline-secondary btn-sm">
+              <i class="bi bi-x me-1"></i>Сбросить
+            </a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-9">
+    <div class="d-flex align-items-center mb-3">
+      <h5 class="fw-bold mb-0 me-auto">
+        {% if results is not none %}
+          <i class="bi bi-list-ul me-2 text-primary"></i>Результаты поиска
+          <span class="badge bg-primary ms-2">{{ results|length }}</span>
+        {% else %}
+          <i class="bi bi-info-circle me-2 text-muted"></i>Введите параметры и нажмите «Найти»
+        {% endif %}
+      </h5>
+      {% if results %}
+      <a href="/reports/new" class="btn btn-sm btn-primary">
+        <i class="bi bi-plus-lg me-1"></i>Добавить отчёт
+      </a>
+      {% endif %}
+    </div>
+
+    {% if results is not none %}
+      {% if results %}
+      <div class="card shadow-sm">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-3">№</th>
+                <th>Название</th>
+                <th>Автор</th>
+                <th>Предмет</th>
+                <th>Группа</th>
+                <th>Статус</th>
+                <th class="text-end">Флеш</th>
+                <th class="text-end">Оригин. %</th>
+                <th>Дата</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in results %}
+              <tr class="clickable-row" data-href="/reports/{{ r.id }}" style="cursor:pointer">
+                <td class="ps-3 text-muted">{{ loop.index }}</td>
+                <td class="fw-semibold text-truncate" style="max-width:200px" title="{{ r.title }}">{{ r.title }}</td>
+                <td class="small text-muted">{{ r.author }}</td>
+                <td class="small">{{ r.subject }}</td>
+                <td><span class="badge bg-secondary">{{ r.group }}</span></td>
+                <td>
+                  {% if r.status == 'Готов' %}<span class="badge bg-success">{{ r.status }}</span>
+                  {% else %}<span class="badge bg-warning text-dark">{{ r.status }}</span>{% endif %}
+                </td>
+                <td class="text-end">{{ r.flesh_index or '—' }}</td>
+                <td class="text-end">
+                  {% if r.originality is not none %}
+                    {% set o = r.originality|float %}
+                    <span class="{% if o < 50 %}text-danger{% elif o < 75 %}text-warning{% else %}text-success{% endif %} fw-semibold">{{ o }}%</span>
+                  {% else %}—{% endif %}
+                </td>
+                <td class="small text-muted">{{ r.upload_date_str }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% else %}
+      <div class="text-center py-5 text-muted">
+        <i class="bi bi-search" style="font-size:3rem"></i>
+        <p class="mt-3">Ничего не найдено по заданным критериям</p>
+      </div>
+      {% endif %}
+    {% else %}
+    <div class="text-center py-5 text-muted">
+      <i class="bi bi-funnel" style="font-size:3rem"></i>
+      <p class="mt-3">Укажите критерии поиска слева и нажмите кнопку</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.clickable-row').forEach(r =>
+  r.addEventListener('click', () => window.location = r.dataset.href)
+);
+</script>
+{% endblock %}

@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Редактировать студента{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center mb-4 gap-2">
+  <a href="/students/{{ student.id }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+  <h5 class="mb-0 fw-bold"><i class="bi bi-pencil me-2 text-warning"></i>Редактировать студента #{{ student.id }}</h5>
+</div>
+<div class="row justify-content-center">
+  <div class="col-lg-5">
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <form method="post" action="/students/{{ student.id }}/edit">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Фамилия <span class="text-danger">*</span></label>
+            <input name="surname" type="text" class="form-control" required value="{{ student.surname }}"/>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Имя <span class="text-danger">*</span></label>
+            <input name="name" type="text" class="form-control" required value="{{ student.name }}"/>
+          </div>
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Группа <span class="text-danger">*</span></label>
+            <input name="group" type="number" class="form-control" required value="{{ student.group }}"/>
+          </div>
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-warning flex-fill text-white"><i class="bi bi-save me-1"></i>Сохранить</button>
+            <a href="/students/{{ student.id }}" class="btn btn-outline-secondary">Отмена</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
