@@ -1,6 +1,5 @@
 import json
 import time
-import hashlib
 from io import BytesIO
 from typing import List
 
@@ -14,6 +13,7 @@ from server.app.services.text_processor import process_docx
 
 router = APIRouter(tags=["import_export"])
 templates = Jinja2Templates(directory="client/templates")
+
 
 @router.get("/import")
 async def import_page(request: Request):
@@ -35,7 +35,6 @@ async def mass_upload(
         return JSONResponse({"error": "unauthorized"}, status_code=401)
 
     results = []
-
     for f in files:
         if not f.filename.endswith(".docx"):
             results.append({"filename": f.filename, "status": "Ошибка", "detail": "Не .docx файл"})
@@ -43,9 +42,8 @@ async def mass_upload(
         try:
             content = await f.read()
             title = f.filename.replace(".docx", "")
-            author = title
-            data = process_docx(content, title, author, default_group, default_subject)
-
+            data = process_docx(content, title, title, default_group, default_subject)
+            data["file_size"] = len(content)
             report_id = _store_report_from_data(data)
             results.append({"filename": f.filename, "status": "Готов", "report_id": report_id})
         except Exception as e:
@@ -69,7 +67,8 @@ def _store_report_from_data(data: dict) -> int:
             subject:$subject, words_count:$wc, flesh_index:$fi,
             keyword_density:$kd, originality:100.0,
             conclusion:$conc, bibliography:$bib, introduction:$intro,
-            status:'Готов', upload_date:$ts, comment:''
+            status:'Готов', upload_date:$ts, updated_at:$ts, comment:'',
+            file_size:$file_size
         })
         """,
         {
@@ -78,7 +77,7 @@ def _store_report_from_data(data: dict) -> int:
             "wc": data["words_count"], "fi": data["flesh_index"],
             "kd": data["keyword_density"], "conc": data["conclusion"],
             "bib": data["bibliography"], "intro": data["introduction"],
-            "ts": int(time.time()),
+            "ts": int(time.time()), "file_size": data.get("file_size"),
         },
     )
 
@@ -119,6 +118,7 @@ def _store_report_from_data(data: dict) -> int:
     )
     return report_id
 
+
 @router.get("/export")
 async def export_all(request: Request):
     user = get_current_user(request)
@@ -129,16 +129,9 @@ async def export_all(request: Request):
     reports = run_query("MATCH (r:Report) RETURN r{.*} AS r ORDER BY r.id")
     parts = run_query("MATCH (p:Part) RETURN p{.*} AS p ORDER BY p.id")
     chunks = run_query("MATCH (c:Chunk) RETURN c{.*} AS c ORDER BY c.id")
-
-    submitted = run_query(
-        "MATCH (s:Student)-[:SUBMITTED]->(r:Report) RETURN s.id AS student_id, r.id AS report_id"
-    )
-    has_part = run_query(
-        "MATCH (r:Report)-[:HAS_PART]->(p:Part) RETURN r.id AS report_id, p.id AS part_id"
-    )
-    contains = run_query(
-        "MATCH (p:Part)-[:CONTAINS]->(c:Chunk) RETURN p.id AS part_id, c.id AS chunk_id"
-    )
+    submitted = run_query("MATCH (s:Student)-[:SUBMITTED]->(r:Report) RETURN s.id AS student_id, r.id AS report_id")
+    has_part = run_query("MATCH (r:Report)-[:HAS_PART]->(p:Part) RETURN r.id AS report_id, p.id AS part_id")
+    contains = run_query("MATCH (p:Part)-[:CONTAINS]->(c:Chunk) RETURN p.id AS part_id, c.id AS chunk_id")
 
     export_data = {
         "students": [r["s"] for r in students],
@@ -159,6 +152,7 @@ async def export_all(request: Request):
         headers={"Content-Disposition": "attachment; filename=export.json"},
     )
 
+
 @router.post("/import/json")
 async def import_json(request: Request, file: UploadFile = File(...)):
     user = get_current_user(request)
@@ -173,10 +167,14 @@ async def import_json(request: Request, file: UploadFile = File(...)):
 
     run_write("MATCH (n) DETACH DELETE n")
 
+    students_before = len(data.get("students", []))
+    reports_before = len(data.get("reports", []))
+
     for s in data.get("students", []):
         run_write(
-            "MERGE (s:Student {id:$id}) SET s.name=$name, s.surname=$surname, s.group=$group",
-            {"id": s["id"], "name": s["name"], "surname": s["surname"], "group": s["group"]},
+            "MERGE (s:Student {id:$id}) SET s.name=$name, s.surname=$surname, s.group=$group, s.created_at=$ca, s.updated_at=$ua",
+            {"id": s["id"], "name": s["name"], "surname": s["surname"], "group": s["group"],
+             "ca": s.get("created_at", int(time.time())), "ua": s.get("updated_at", int(time.time()))},
         )
 
     for r in data.get("reports", []):
@@ -187,26 +185,29 @@ async def import_json(request: Request, file: UploadFile = File(...)):
                 r.subject=$subject, r.words_count=$wc, r.flesh_index=$fi,
                 r.keyword_density=$kd, r.originality=$orig,
                 r.conclusion=$conc, r.bibliography=$bib, r.introduction=$intro,
-                r.status=$status, r.upload_date=$ud, r.comment=$comment
+                r.status=$status, r.upload_date=$ud, r.updated_at=$ua,
+                r.comment=$comment, r.file_size=$fs
             """,
             {
-                "id": r["id"], "title": r.get("title",""), "author": r.get("author",""),
-                "group": r.get("group", 0), "subject": r.get("subject",""),
-                "wc": r.get("words_count",0), "fi": r.get("flesh_index",0),
-                "kd": r.get("keyword_density",0), "orig": r.get("originality",100.0),
+                "id": r["id"], "title": r.get("title", ""), "author": r.get("author", ""),
+                "group": r.get("group", 0), "subject": r.get("subject", ""),
+                "wc": r.get("words_count", 0), "fi": r.get("flesh_index", 0),
+                "kd": r.get("keyword_density", 0), "orig": r.get("originality", 100.0),
                 "conc": r.get("conclusion", False), "bib": r.get("bibliography", False),
-                "intro": r.get("introduction", False), "status": r.get("status","Готов"),
-                "ud": r.get("upload_date", int(time.time())), "comment": r.get("comment",""),
+                "intro": r.get("introduction", False), "status": r.get("status", "Готов"),
+                "ud": r.get("upload_date", int(time.time())),
+                "ua": r.get("updated_at", int(time.time())),
+                "comment": r.get("comment", ""), "fs": r.get("file_size"),
             },
         )
 
     for p in data.get("parts", []):
-        run_write("MERGE (p:Part {id:$id}) SET p.type=$t", {"id": p["id"], "t": p.get("type","")})
+        run_write("MERGE (p:Part {id:$id}) SET p.type=$t", {"id": p["id"], "t": p.get("type", "")})
 
     for c in data.get("chunks", []):
         run_write(
             "MERGE (c:Chunk {id:$id}) SET c.text=$t, c.hash=$h",
-            {"id": c["id"], "t": c.get("text",""), "h": c.get("hash","")},
+            {"id": c["id"], "t": c.get("text", ""), "h": c.get("hash", "")},
         )
 
     rels = data.get("relationships", {})
@@ -226,4 +227,9 @@ async def import_json(request: Request, file: UploadFile = File(...)):
             {"pid": rel["part_id"], "cid": rel["chunk_id"]},
         )
 
-    return JSONResponse({"status": "ok", "message": "Данные успешно импортированы"})
+    msg = (
+        f"Данные успешно импортированы: добавлено {reports_before} отчётов, "
+        f"{students_before} студентов, "
+        f"{len(data.get('chunks', []))} фрагментов текста."
+    )
+    return JSONResponse({"status": "ok", "message": msg})

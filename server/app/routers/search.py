@@ -58,16 +58,56 @@ def _do_search(params: dict) -> list:
         conditions.append("r.status = $status")
         query_params["status"] = status
 
+    comment = params.get("comment", "").strip()
+    if comment:
+        conditions.append("toLower(r.comment) CONTAINS toLower($comment)")
+        query_params["comment"] = comment
+
+    date_from = params.get("date_from", "").strip()
+    if date_from:
+        try:
+            ts_from = int(datetime.datetime.strptime(date_from, "%Y-%m-%dT%H:%M").timestamp())
+            conditions.append("r.upload_date >= $ts_from")
+            query_params["ts_from"] = ts_from
+        except ValueError:
+            pass
+
+    date_to = params.get("date_to", "").strip()
+    if date_to:
+        try:
+            ts_to = int(datetime.datetime.strptime(date_to, "%Y-%m-%dT%H:%M").timestamp())
+            conditions.append("r.upload_date <= $ts_to")
+            query_params["ts_to"] = ts_to
+        except ValueError:
+            pass
+
     min_flesh = params.get("min_flesh", "").strip()
     if min_flesh and min_flesh.isdigit():
         conditions.append("r.flesh_index >= $min_flesh")
         query_params["min_flesh"] = int(min_flesh)
 
+    max_flesh = params.get("max_flesh", "").strip()
+    if max_flesh and max_flesh.isdigit() and int(max_flesh) < 100:
+        conditions.append("r.flesh_index <= $max_flesh")
+        query_params["max_flesh"] = int(max_flesh)
+
     min_originality = params.get("min_originality", "").strip()
     if min_originality:
         try:
-            conditions.append("r.originality >= $min_orig")
-            query_params["min_orig"] = float(min_originality)
+            v = float(min_originality)
+            if v > 0:
+                conditions.append("r.originality >= $min_orig")
+                query_params["min_orig"] = v
+        except ValueError:
+            pass
+
+    max_originality = params.get("max_originality", "").strip()
+    if max_originality:
+        try:
+            v = float(max_originality)
+            if v < 100:
+                conditions.append("r.originality <= $max_orig")
+                query_params["max_orig"] = v
         except ValueError:
             pass
 
@@ -78,7 +118,6 @@ def _do_search(params: dict) -> list:
         WHERE toLower(c.text) CONTAINS toLower($word)
         {"AND " + " AND ".join(conditions) if conditions else ""}
         WITH DISTINCT r
-        OPTIONAL MATCH (s:Student)-[:SUBMITTED]->(r)
         RETURN r.id AS id, r.title AS title, r.author AS author,
                r.group AS group, r.subject AS subject, r.status AS status,
                r.words_count AS words_count, r.flesh_index AS flesh_index,
@@ -91,7 +130,6 @@ def _do_search(params: dict) -> list:
         base_query = f"""
         MATCH (r:Report)
         {where_clause}
-        OPTIONAL MATCH (s:Student)-[:SUBMITTED]->(r)
         RETURN r.id AS id, r.title AS title, r.author AS author,
                r.group AS group, r.subject AS subject, r.status AS status,
                r.words_count AS words_count, r.flesh_index AS flesh_index,
@@ -103,6 +141,6 @@ def _do_search(params: dict) -> list:
 
     for r in rows:
         ts = r.get("upload_date")
-        r["upload_date_str"] = datetime.datetime.fromtimestamp(ts).strftime("%d.%m.%Y") if ts else "—"
+        r["upload_date_str"] = datetime.datetime.fromtimestamp(ts).strftime("%d.%m.%Y %H:%M") if ts else "—"
 
     return rows

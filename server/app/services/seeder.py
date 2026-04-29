@@ -276,8 +276,8 @@ def seed_data():
 
     for s in SEED_DATA["students"]:
         run_write(
-            "MERGE (s:Student {id: $id}) SET s.name=$name, s.surname=$surname, s.group=$group",
-            s,
+            "MERGE (s:Student {id: $id}) SET s.name=$name, s.surname=$surname, s.group=$group, s.created_at=$ts, s.updated_at=$ts",
+            {**s, "ts": int(__import__("time").time()) - (8 - s["id"]) * 86400 * 10},
         )
 
     chunk_id_counter = 1
@@ -296,7 +296,7 @@ def seed_data():
                 r.flesh_index=$flesh_index, r.keyword_density=$keyword_density,
                 r.originality=$originality, r.conclusion=$conclusion,
                 r.bibliography=$bibliography, r.introduction=$introduction,
-                r.status=$status, r.upload_date=$upload_date, r.comment=$comment
+                r.status=$status, r.upload_date=$upload_date, r.updated_at=$upload_date, r.comment=$comment, r.file_size=null
             """,
             {
                 "id": report_id,

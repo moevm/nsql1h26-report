@@ -2,23 +2,23 @@
 {% block title %}{{ report.title }} — АнтиПлагиат{% endblock %}
 
 {% block content %}
+{% if saved %}
+<div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
+  <i class="bi bi-check-circle me-2"></i>Комментарий успешно сохранён.
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
 <div class="d-flex align-items-center mb-4 gap-2">
   <a href="/dashboard" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
   <div class="me-auto">
     <h5 class="mb-0 fw-bold">{{ report.title }}</h5>
     <small class="text-muted">Детальный просмотр отчёта #{{ report.id }}</small>
   </div>
-  <a href="/reports/{{ report.id }}/edit" class="btn btn-sm btn-outline-primary">
-    <i class="bi bi-pencil me-1"></i>Редактировать
-  </a>
-  <a href="/graph/{{ report.id }}" class="btn btn-sm btn-outline-info">
-    <i class="bi bi-diagram-3 me-1"></i>Граф
-  </a>
-  <a href="/plagiarism/{{ report.id }}" class="btn btn-sm btn-outline-danger">
-    <i class="bi bi-copy me-1"></i>Плагиат
-  </a>
-  <form method="post" action="/reports/{{ report.id }}/delete" class="d-inline"
-        onsubmit="return confirm('Удалить этот отчёт?')">
+  <a href="/reports/{{ report.id }}/edit" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil me-1"></i>Редактировать</a>
+  <a href="/graph/{{ report.id }}" class="btn btn-sm btn-outline-info"><i class="bi bi-diagram-3 me-1"></i>Граф</a>
+  <a href="/plagiarism/{{ report.id }}" class="btn btn-sm btn-outline-danger"><i class="bi bi-copy me-1"></i>Плагиат</a>
+  <form method="post" action="/reports/{{ report.id }}/delete" class="d-inline" onsubmit="return confirm('Удалить этот отчёт?')">
     <button class="btn btn-sm btn-danger"><i class="bi bi-trash"></i></button>
   </form>
 </div>
@@ -35,12 +35,12 @@
             <tr><td class="text-muted ps-3">Группа</td><td><span class="badge bg-secondary">{{ report.group }}</span></td></tr>
             <tr><td class="text-muted ps-3">Предмет</td><td>{{ report.subject }}</td></tr>
             <tr><td class="text-muted ps-3">Статус</td>
-              <td>
-                {% if report.status == 'Готов' %}<span class="badge bg-success">{{ report.status }}</span>
-                {% else %}<span class="badge bg-warning text-dark">{{ report.status }}</span>{% endif %}
-              </td>
+              <td>{% if report.status == 'Готов' %}<span class="badge bg-success">{{ report.status }}</span>
+              {% else %}<span class="badge bg-warning text-dark">{{ report.status }}</span>{% endif %}</td>
             </tr>
-            <tr><td class="text-muted ps-3">Загружен</td><td>{{ report.upload_date_str }}</td></tr>
+            <tr><td class="text-muted ps-3">Загружен</td><td class="small">{{ report.upload_date_str }}</td></tr>
+            <tr><td class="text-muted ps-3">Изменён</td><td class="small">{{ report.updated_at_str }}</td></tr>
+            <tr><td class="text-muted ps-3">Размер файла</td><td class="small">{{ report.file_size_str }}</td></tr>
             {% if student %}
             <tr><td class="text-muted ps-3">Студент</td>
               <td><a href="/students/{{ student.id }}">{{ student.name }} {{ student.surname }}</a></td>
@@ -98,16 +98,9 @@
     <div class="card shadow-sm mb-3">
       <div class="card-header fw-bold bg-light"><i class="bi bi-chat-left-text me-2 text-secondary"></i>Комментарий</div>
       <div class="card-body">
-        <form method="post" action="/reports/{{ report.id }}/edit">
-          <input type="hidden" name="title" value="{{ report.title }}"/>
-          <input type="hidden" name="author" value="{{ report.author }}"/>
-          <input type="hidden" name="group" value="{{ report.group }}"/>
-          <input type="hidden" name="subject" value="{{ report.subject }}"/>
-          <textarea name="comment" class="form-control mb-2" rows="3"
-                    placeholder="Добавьте комментарий к отчёту...">{{ report.comment or '' }}</textarea>
-          <button class="btn btn-sm btn-primary">
-            <i class="bi bi-save me-1"></i>Сохранить комментарий
-          </button>
+        <form method="post" action="/reports/{{ report.id }}/comment">
+          <textarea name="comment" class="form-control mb-2" rows="3" placeholder="Добавьте комментарий к отчёту...">{{ report.comment or '' }}</textarea>
+          <button class="btn btn-sm btn-primary"><i class="bi bi-save me-1"></i>Сохранить комментарий</button>
         </form>
       </div>
     </div>
@@ -123,20 +116,20 @@
             <tr>
               <th class="ps-3">Источник</th>
               <th>Автор</th>
-              <th class="text-end">Совп. фрагм.</th>
+              <th class="text-end">Строк</th>
+              <th class="text-end">% от документа</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {% for s in suspects %}
             <tr>
-              <td class="ps-3 fw-semibold text-truncate" style="max-width:200px" title="{{ s.suspect_title }}">
-                {{ s.suspect_title }}
-              </td>
+              <td class="ps-3 fw-semibold text-truncate" style="max-width:180px" title="{{ s.suspect_title }}">{{ s.suspect_title }}</td>
               <td class="text-muted small">{{ s.suspect_author }}</td>
               <td class="text-end"><span class="badge bg-danger">{{ s.shared_chunks }}</span></td>
+              <td class="text-end"><span class="badge bg-warning text-dark">{{ s.shared_pct }}%</span></td>
               <td>
-                <a href="/plagiarism/{{ report.id }}/compare/{{ s.suspect_id }}" class="btn btn-xs btn-sm btn-outline-danger">
+                <a href="/plagiarism/{{ report.id }}/compare/{{ s.suspect_id }}" class="btn btn-sm btn-outline-danger">
                   <i class="bi bi-eye me-1"></i>Сравнить
                 </a>
               </td>
@@ -156,12 +149,8 @@
     {% endif %}
 
     <div class="mt-3 d-flex gap-2">
-      <a href="/graph/{{ report.id }}" class="btn btn-info text-white flex-fill">
-        <i class="bi bi-diagram-3 me-2"></i>Просмотреть граф
-      </a>
-      <a href="/plagiarism/{{ report.id }}" class="btn btn-danger flex-fill">
-        <i class="bi bi-copy me-2"></i>Проверка на плагиат
-      </a>
+      <a href="/graph/{{ report.id }}" class="btn btn-info text-white flex-fill"><i class="bi bi-diagram-3 me-2"></i>Просмотреть граф</a>
+      <a href="/plagiarism/{{ report.id }}" class="btn btn-danger flex-fill"><i class="bi bi-copy me-2"></i>Проверка на плагиат</a>
     </div>
   </div>
 </div>

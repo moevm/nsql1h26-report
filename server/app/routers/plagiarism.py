@@ -31,7 +31,13 @@ async def plagiarism_page(request: Request, report_id: int):
         raise HTTPException(status_code=404, detail="Report not found")
 
     report = dict(report_result[0]["r"])
-    
+
+    total_chunks_res = run_query(
+        "MATCH (r:Report {id:$rid})-[:HAS_PART]->(:Part)-[:CONTAINS]->(c:Chunk) RETURN count(c) AS cnt",
+        {"rid": report_id},
+    )
+    total_chunks = total_chunks_res[0]["cnt"] if total_chunks_res else 0
+
     suspects = run_query(
         """
         MATCH (r1:Report {id:$rid})-[:HAS_PART]->(:Part)-[:CONTAINS]->(c:Chunk)
@@ -45,14 +51,13 @@ async def plagiarism_page(request: Request, report_id: int):
         {"rid": report_id},
     )
 
+    for s in suspects:
+        pct = round(s["shared_chunks"] / total_chunks * 100) if total_chunks else 0
+        s["shared_pct"] = pct
+
     return templates.TemplateResponse(
         "plagiarism.html",
-        {
-            "request": request,
-            "user": user,
-            "report": report,
-            "suspects": suspects,
-        },
+        {"request": request, "user": user, "report": report, "suspects": suspects},
     )
 
 

@@ -1,5 +1,4 @@
 import time
-import json
 import datetime
 from io import BytesIO
 from typing import Optional
@@ -32,7 +31,8 @@ def _store_report(data: dict, student_id: Optional[int] = None) -> int:
             keyword_density: $keyword_density, originality: $originality,
             conclusion: $conclusion, bibliography: $bibliography,
             introduction: $introduction, status: $status,
-            upload_date: $upload_date, comment: $comment
+            upload_date: $upload_date, updated_at: $updated_at,
+            comment: $comment, file_size: $file_size
         })
         """,
         {
@@ -50,7 +50,9 @@ def _store_report(data: dict, student_id: Optional[int] = None) -> int:
             "introduction": data["introduction"],
             "status": "Готов",
             "upload_date": int(time.time()),
+            "updated_at": int(time.time()),
             "comment": data.get("comment", ""),
+            "file_size": data.get("file_size"),
         },
     )
 
@@ -65,20 +67,13 @@ def _store_report(data: dict, student_id: Optional[int] = None) -> int:
 
     for i, part in enumerate(data.get("parts", [])):
         part_id = part_id_base + i
-        run_write(
-            "MERGE (p:Part {id:$id}) SET p.type=$type",
-            {"id": part_id, "type": part["type"]},
-        )
+        run_write("MERGE (p:Part {id:$id}) SET p.type=$type", {"id": part_id, "type": part["type"]})
         run_write(
             "MATCH (r:Report {id:$rid}), (p:Part {id:$pid}) MERGE (r)-[:HAS_PART]->(p)",
             {"rid": report_id, "pid": part_id},
         )
-
         for chunk in part.get("chunks", []):
-            existing = run_query(
-                "MATCH (c:Chunk {hash:$hash}) RETURN c.id AS id LIMIT 1",
-                {"hash": chunk["hash"]},
-            )
+            existing = run_query("MATCH (c:Chunk {hash:$hash}) RETURN c.id AS id LIMIT 1", {"hash": chunk["hash"]})
             if existing:
                 cid = existing[0]["id"]
             else:
@@ -88,7 +83,6 @@ def _store_report(data: dict, student_id: Optional[int] = None) -> int:
                     "MERGE (c:Chunk {id:$id}) SET c.text=$text, c.hash=$hash",
                     {"id": cid, "text": chunk["text"], "hash": chunk["hash"]},
                 )
-
             run_write(
                 "MATCH (p:Part {id:$pid}), (c:Chunk {id:$cid}) MERGE (p)-[:CONTAINS]->(c)",
                 {"pid": part_id, "cid": cid},
@@ -106,7 +100,6 @@ def _store_report(data: dict, student_id: Optional[int] = None) -> int:
         """,
         {"rid": report_id},
     )
-
     return report_id
 
 
@@ -134,17 +127,21 @@ async def upload_report(
     if not user:
         return RedirectResponse(url="/login", status_code=302)
 
+    file_size = None
     if file and file.filename and file.filename.endswith(".docx"):
         content = await file.read()
+        file_size = len(content)
         try:
             data = process_docx(content, title, author, group, subject)
             data["comment"] = comment
-        except Exception as e:
+            data["file_size"] = file_size
+        except Exception:
             data = {
                 "title": title, "author": author, "group": group, "subject": subject,
                 "comment": comment, "parts": [], "words_count": 0,
                 "flesh_index": 0, "keyword_density": 0,
                 "introduction": False, "conclusion": False, "bibliography": False,
+                "file_size": file_size,
             }
     else:
         data = {
@@ -152,6 +149,7 @@ async def upload_report(
             "comment": comment, "parts": [], "words_count": 0,
             "flesh_index": 0, "keyword_density": 0,
             "introduction": False, "conclusion": False, "bibliography": False,
+            "file_size": None,
         }
 
     report_id = _store_report(data, student_id)
@@ -165,11 +163,7 @@ async def report_detail(request: Request, report_id: int):
         return RedirectResponse(url="/login", status_code=302)
 
     result = run_query(
-        """
-        MATCH (r:Report {id:$id})
-        OPTIONAL MATCH (s:Student)-[:SUBMITTED]->(r)
-        RETURN r, s
-        """,
+        "MATCH (r:Report {id:$id}) OPTIONAL MATCH (s:Student)-[:SUBMITTED]->(r) RETURN r, s",
         {"id": report_id},
     )
     if not result:
@@ -180,6 +174,19 @@ async def report_detail(request: Request, report_id: int):
 
     ts = r.get("upload_date")
     r["upload_date_str"] = datetime.datetime.fromtimestamp(ts).strftime("%d.%m.%Y %H:%M") if ts else "—"
+
+    uts = r.get("updated_at")
+    r["updated_at_str"] = datetime.datetime.fromtimestamp(uts).strftime("%d.%m.%Y %H:%M") if uts else "—"
+
+    fs = r.get("file_size")
+    if fs is None:
+        r["file_size_str"] = "—"
+    elif fs >= 1024 * 1024:
+        r["file_size_str"] = f"{fs / 1024 / 1024:.1f} МБ"
+    elif fs >= 1024:
+        r["file_size_str"] = f"{fs / 1024:.1f} КБ"
+    else:
+        r["file_size_str"] = f"{fs} Б"
 
     plagiarism_suspects = run_query(
         """
@@ -194,10 +201,39 @@ async def report_detail(request: Request, report_id: int):
         {"rid": report_id},
     )
 
+    total_chunks = run_query(
+        "MATCH (r:Report {id:$rid})-[:HAS_PART]->(:Part)-[:CONTAINS]->(c:Chunk) RETURN count(c) AS cnt",
+        {"rid": report_id},
+    )
+    total = total_chunks[0]["cnt"] if total_chunks else 0
+
+    for s_row in plagiarism_suspects:
+        pct = round(s_row["shared_chunks"] / total * 100) if total else 0
+        s_row["shared_pct"] = pct
+
+    saved = request.query_params.get("saved")
+
     return templates.TemplateResponse(
         "report_detail.html",
-        {"request": request, "user": user, "report": r, "student": s, "suspects": plagiarism_suspects},
+        {"request": request, "user": user, "report": r, "student": s,
+         "suspects": plagiarism_suspects, "saved": saved},
     )
+
+
+@router.post("/{report_id}/comment")
+async def save_comment(
+    request: Request,
+    report_id: int,
+    comment: str = Form(""),
+):
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=302)
+    run_write(
+        "MATCH (r:Report {id:$id}) SET r.comment=$comment, r.updated_at=$ts",
+        {"id": report_id, "comment": comment, "ts": int(time.time())},
+    )
+    return RedirectResponse(url=f"/reports/{report_id}?saved=1", status_code=302)
 
 
 @router.get("/{report_id}/edit")
@@ -205,19 +241,13 @@ async def edit_report_page(request: Request, report_id: int):
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=302)
-
     result = run_query("MATCH (r:Report {id:$id}) RETURN r", {"id": report_id})
     if not result:
         raise HTTPException(status_code=404, detail="Not found")
-
     r = dict(result[0]["r"])
     students = run_query("MATCH (s:Student) RETURN s.id AS id, s.name AS name, s.surname AS surname, s.group AS group ORDER BY s.surname")
-    student_result = run_query(
-        "MATCH (s:Student)-[:SUBMITTED]->(r:Report {id:$id}) RETURN s.id AS sid",
-        {"id": report_id},
-    )
+    student_result = run_query("MATCH (s:Student)-[:SUBMITTED]->(r:Report {id:$id}) RETURN s.id AS sid", {"id": report_id})
     current_sid = student_result[0]["sid"] if student_result else None
-
     return templates.TemplateResponse(
         "report_edit.html",
         {"request": request, "user": user, "report": r, "students": students, "current_sid": current_sid},
@@ -238,19 +268,16 @@ async def edit_report_submit(
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=302)
-
     run_write(
-        "MATCH (r:Report {id:$id}) SET r.title=$title, r.author=$author, r.group=$group, r.subject=$subject, r.comment=$comment",
-        {"id": report_id, "title": title, "author": author, "group": group, "subject": subject, "comment": comment},
+        "MATCH (r:Report {id:$id}) SET r.title=$title, r.author=$author, r.group=$group, r.subject=$subject, r.comment=$comment, r.updated_at=$ts",
+        {"id": report_id, "title": title, "author": author, "group": group, "subject": subject, "comment": comment, "ts": int(time.time())},
     )
-
     if student_id:
         run_write("MATCH (s:Student)-[rel:SUBMITTED]->(r:Report {id:$rid}) DELETE rel", {"rid": report_id})
         run_write(
             "MATCH (s:Student {id:$sid}), (r:Report {id:$rid}) MERGE (s)-[:SUBMITTED]->(r)",
             {"sid": student_id, "rid": report_id},
         )
-
     return RedirectResponse(url=f"/reports/{report_id}", status_code=302)
 
 
@@ -259,7 +286,6 @@ async def delete_report(request: Request, report_id: int):
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=302)
-
     run_write(
         """
         MATCH (r:Report {id:$id})-[:HAS_PART]->(p:Part)-[:CONTAINS]->(c:Chunk)
@@ -269,9 +295,6 @@ async def delete_report(request: Request, report_id: int):
         """,
         {"id": report_id},
     )
-    run_write(
-        "MATCH (r:Report {id:$id})-[:HAS_PART]->(p:Part) DETACH DELETE p",
-        {"id": report_id},
-    )
+    run_write("MATCH (r:Report {id:$id})-[:HAS_PART]->(p:Part) DETACH DELETE p", {"id": report_id})
     run_write("MATCH (r:Report {id:$id}) DETACH DELETE r", {"id": report_id})
     return RedirectResponse(url="/dashboard", status_code=302)

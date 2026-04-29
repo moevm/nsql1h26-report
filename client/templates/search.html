@@ -9,29 +9,25 @@
         <i class="bi bi-funnel me-2"></i>Фильтры
       </div>
       <div class="card-body">
-        <form method="get" action="/search/" id="searchForm">
-          <div class="mb-3">
-            <label class="form-label small fw-semibold">Название документа</label>
-            <input name="title" type="text" class="form-control form-control-sm"
-                   placeholder="подстрока..." value="{{ params.get('title','') }}"/>
+        <form method="get" action="/search/">
+          <div class="mb-2">
+            <label class="form-label small fw-semibold mb-1">Название документа</label>
+            <input name="title" type="text" class="form-control form-control-sm" placeholder="подстрока..." value="{{ params.get('title','') }}"/>
           </div>
-          <div class="mb-3">
-            <label class="form-label small fw-semibold">Автор</label>
-            <input name="author" type="text" class="form-control form-control-sm"
-                   placeholder="подстрока..." value="{{ params.get('author','') }}"/>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold mb-1">Автор</label>
+            <input name="author" type="text" class="form-control form-control-sm" placeholder="подстрока..." value="{{ params.get('author','') }}"/>
           </div>
-          <div class="mb-3">
-            <label class="form-label small fw-semibold">Группа</label>
-            <input name="group" type="number" class="form-control form-control-sm"
-                   placeholder="например 3341" value="{{ params.get('group','') }}"/>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold mb-1">Группа</label>
+            <input name="group" type="number" class="form-control form-control-sm" placeholder="например 3341" value="{{ params.get('group','') }}"/>
           </div>
-          <div class="mb-3">
-            <label class="form-label small fw-semibold">Предмет</label>
-            <input name="subject" type="text" class="form-control form-control-sm"
-                   placeholder="подстрока..." value="{{ params.get('subject','') }}"/>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold mb-1">Предмет</label>
+            <input name="subject" type="text" class="form-control form-control-sm" placeholder="подстрока..." value="{{ params.get('subject','') }}"/>
           </div>
-          <div class="mb-3">
-            <label class="form-label small fw-semibold">Статус</label>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold mb-1">Статус</label>
             <select name="status" class="form-select form-select-sm">
               <option value="">— Любой —</option>
               <option value="Готов" {% if params.get('status')=='Готов' %}selected{% endif %}>Готов</option>
@@ -39,36 +35,61 @@
               <option value="Ошибка" {% if params.get('status')=='Ошибка' %}selected{% endif %}>Ошибка</option>
             </select>
           </div>
-          <div class="mb-3">
-            <label class="form-label small fw-semibold">Содержит слово</label>
-            <input name="word" type="text" class="form-control form-control-sm"
-                   placeholder="поиск в тексте..." value="{{ params.get('word','') }}"/>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold mb-1">Содержит слово</label>
+            <input name="word" type="text" class="form-control form-control-sm" placeholder="поиск в тексте..." value="{{ params.get('word','') }}"/>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold mb-1">Комментарий</label>
+            <input name="comment" type="text" class="form-control form-control-sm" placeholder="подстрока..." value="{{ params.get('comment','') }}"/>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold mb-1">Дата загрузки с</label>
+            <input name="date_from" type="datetime-local" class="form-control form-control-sm" value="{{ params.get('date_from','') }}"/>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold mb-1">Дата загрузки по</label>
+            <input name="date_to" type="datetime-local" class="form-control form-control-sm" value="{{ params.get('date_to','') }}"/>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold mb-1 d-flex justify-content-between">
+              <span>Индекс Флеша</span>
+              <span><span id="fleshMinV">{{ params.get('min_flesh','0') }}</span>–<span id="fleshMaxV">{{ params.get('max_flesh','100') }}</span></span>
+            </label>
+            <div class="d-flex gap-1 align-items-center">
+              <span class="small text-muted">Мин</span>
+              <input name="min_flesh" type="range" class="form-range" min="0" max="100"
+                     value="{{ params.get('min_flesh','0') }}"
+                     oninput="document.getElementById('fleshMinV').textContent=this.value"/>
+            </div>
+            <div class="d-flex gap-1 align-items-center">
+              <span class="small text-muted">Макс</span>
+              <input name="max_flesh" type="range" class="form-range" min="0" max="100"
+                     value="{{ params.get('max_flesh','100') }}"
+                     oninput="document.getElementById('fleshMaxV').textContent=this.value"/>
+            </div>
           </div>
           <div class="mb-3">
-            <label class="form-label small fw-semibold d-flex justify-content-between">
-              <span>Мин. Индекс Флеша</span>
-              <span id="fleshVal">{{ params.get('min_flesh','0') }}</span>
+            <label class="form-label small fw-semibold mb-1 d-flex justify-content-between">
+              <span>Оригинальность %</span>
+              <span><span id="origMinV">{{ params.get('min_originality','0') }}</span>–<span id="origMaxV">{{ params.get('max_originality','100') }}</span></span>
             </label>
-            <input name="min_flesh" type="range" class="form-range" min="0" max="100"
-                   value="{{ params.get('min_flesh','0') }}"
-                   oninput="document.getElementById('fleshVal').textContent=this.value"/>
-          </div>
-          <div class="mb-4">
-            <label class="form-label small fw-semibold d-flex justify-content-between">
-              <span>Мин. Оригинальность %</span>
-              <span id="origVal">{{ params.get('min_originality','0') }}</span>
-            </label>
-            <input name="min_originality" type="range" class="form-range" min="0" max="100"
-                   value="{{ params.get('min_originality','0') }}"
-                   oninput="document.getElementById('origVal').textContent=this.value"/>
+            <div class="d-flex gap-1 align-items-center">
+              <span class="small text-muted">Мин</span>
+              <input name="min_originality" type="range" class="form-range" min="0" max="100"
+                     value="{{ params.get('min_originality','0') }}"
+                     oninput="document.getElementById('origMinV').textContent=this.value"/>
+            </div>
+            <div class="d-flex gap-1 align-items-center">
+              <span class="small text-muted">Макс</span>
+              <input name="max_originality" type="range" class="form-range" min="0" max="100"
+                     value="{{ params.get('max_originality','100') }}"
+                     oninput="document.getElementById('origMaxV').textContent=this.value"/>
+            </div>
           </div>
           <div class="d-grid gap-2">
-            <button type="submit" class="btn btn-primary btn-sm">
-              <i class="bi bi-search me-1"></i>Найти отчёты
-            </button>
-            <a href="/search/" class="btn btn-outline-secondary btn-sm">
-              <i class="bi bi-x me-1"></i>Сбросить
-            </a>
+            <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-search me-1"></i>Найти отчёты</button>
+            <a href="/search/" class="btn btn-outline-secondary btn-sm"><i class="bi bi-x me-1"></i>Сбросить</a>
           </div>
         </form>
       </div>
@@ -86,9 +107,7 @@
         {% endif %}
       </h5>
       {% if results %}
-      <a href="/reports/new" class="btn btn-sm btn-primary">
-        <i class="bi bi-plus-lg me-1"></i>Добавить отчёт
-      </a>
+      <a href="/reports/new" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg me-1"></i>Добавить отчёт</a>
       {% endif %}
     </div>
 
@@ -107,14 +126,14 @@
                 <th>Статус</th>
                 <th class="text-end">Флеш</th>
                 <th class="text-end">Оригин. %</th>
-                <th>Дата</th>
+                <th>Дата загрузки</th>
               </tr>
             </thead>
             <tbody>
               {% for r in results %}
               <tr class="clickable-row" data-href="/reports/{{ r.id }}" style="cursor:pointer">
                 <td class="ps-3 text-muted">{{ loop.index }}</td>
-                <td class="fw-semibold text-truncate" style="max-width:200px" title="{{ r.title }}">{{ r.title }}</td>
+                <td class="fw-semibold text-truncate" style="max-width:180px" title="{{ r.title }}">{{ r.title }}</td>
                 <td class="small text-muted">{{ r.author }}</td>
                 <td class="small">{{ r.subject }}</td>
                 <td><span class="badge bg-secondary">{{ r.group }}</span></td>
@@ -129,7 +148,7 @@
                     <span class="{% if o < 50 %}text-danger{% elif o < 75 %}text-warning{% else %}text-success{% endif %} fw-semibold">{{ o }}%</span>
                   {% else %}—{% endif %}
                 </td>
-                <td class="small text-muted">{{ r.upload_date_str }}</td>
+                <td class="small text-muted" style="white-space:nowrap">{{ r.upload_date_str }}</td>
               </tr>
               {% endfor %}
             </tbody>
