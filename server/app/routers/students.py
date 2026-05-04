@@ -23,6 +23,15 @@ def _fmt_ts(ts):
     return datetime.datetime.fromtimestamp(ts).strftime("%d.%m.%Y %H:%M")
 
 
+def _parse_dt(value: str) -> int | None:
+    if not value:
+        return None
+    try:
+        return int(datetime.datetime.strptime(value, "%Y-%m-%dT%H:%M").timestamp())
+    except ValueError:
+        return None
+
+
 @router.get("/")
 async def students_list(request: Request):
     user = get_current_user(request)
@@ -31,32 +40,75 @@ async def students_list(request: Request):
 
     params = dict(request.query_params)
 
-    conditions = []
+    having_conditions = []
+    where_conditions = []
     query_params = {}
 
     name = params.get("name", "").strip()
     if name:
-        conditions.append("toLower(s.name) CONTAINS toLower($name)")
+        where_conditions.append("toLower(s.name) CONTAINS toLower($name)")
         query_params["name"] = name
 
     surname = params.get("surname", "").strip()
     if surname:
-        conditions.append("toLower(s.surname) CONTAINS toLower($surname)")
+        where_conditions.append("toLower(s.surname) CONTAINS toLower($surname)")
         query_params["surname"] = surname
 
     group = params.get("group", "").strip()
     if group and group.isdigit():
-        conditions.append("s.group = $group")
+        where_conditions.append("s.group = $group")
         query_params["group"] = int(group)
 
-    where = "WHERE " + " AND ".join(conditions) if conditions else ""
+    min_reports = params.get("min_reports", "").strip()
+    if min_reports and min_reports.isdigit():
+        having_conditions.append("report_count >= $min_reports")
+        query_params["min_reports"] = int(min_reports)
+
+    max_reports = params.get("max_reports", "").strip()
+    if max_reports and max_reports.isdigit():
+        having_conditions.append("report_count <= $max_reports")
+        query_params["max_reports"] = int(max_reports)
+
+    last_upload_from = _parse_dt(params.get("last_upload_from", ""))
+    if last_upload_from is not None:
+        having_conditions.append("last_upload >= $last_upload_from")
+        query_params["last_upload_from"] = last_upload_from
+
+    last_upload_to = _parse_dt(params.get("last_upload_to", ""))
+    if last_upload_to is not None:
+        having_conditions.append("last_upload <= $last_upload_to")
+        query_params["last_upload_to"] = last_upload_to
+
+    created_from = _parse_dt(params.get("created_from", ""))
+    if created_from is not None:
+        where_conditions.append("s.created_at >= $created_from")
+        query_params["created_from"] = created_from
+
+    created_to = _parse_dt(params.get("created_to", ""))
+    if created_to is not None:
+        where_conditions.append("s.created_at <= $created_to")
+        query_params["created_to"] = created_to
+
+    updated_from = _parse_dt(params.get("updated_from", ""))
+    if updated_from is not None:
+        where_conditions.append("s.updated_at >= $updated_from")
+        query_params["updated_from"] = updated_from
+
+    updated_to = _parse_dt(params.get("updated_to", ""))
+    if updated_to is not None:
+        where_conditions.append("s.updated_at <= $updated_to")
+        query_params["updated_to"] = updated_to
+
+    where_clause = "WHERE " + " AND ".join(where_conditions) if where_conditions else ""
+    having_clause = "WHERE " + " AND ".join(having_conditions) if having_conditions else ""
 
     students = run_query(
         f"""
         MATCH (s:Student)
-        {where}
+        {where_clause}
         OPTIONAL MATCH (s)-[:SUBMITTED]->(r:Report)
         WITH s, count(r) AS report_count, max(r.upload_date) AS last_upload
+        {having_clause}
         RETURN s.id AS id, s.name AS name, s.surname AS surname, s.group AS group,
                report_count, last_upload, s.created_at AS created_at, s.updated_at AS updated_at
         ORDER BY s.surname

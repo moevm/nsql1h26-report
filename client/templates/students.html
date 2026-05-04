@@ -10,26 +10,89 @@
 </div>
 
 <div class="card shadow-sm mb-3">
-  <div class="card-header fw-bold bg-light"><i class="bi bi-funnel me-2"></i>Поиск по студентам</div>
-  <div class="card-body py-2">
-    <form method="get" action="/students/" class="row g-2 align-items-end">
-      <div class="col-sm-3">
-        <label class="form-label small fw-semibold mb-1">Имя</label>
-        <input name="name" type="text" class="form-control form-control-sm" placeholder="подстрока..." value="{{ params.get('name','') }}"/>
-      </div>
-      <div class="col-sm-3">
-        <label class="form-label small fw-semibold mb-1">Фамилия</label>
-        <input name="surname" type="text" class="form-control form-control-sm" placeholder="подстрока..." value="{{ params.get('surname','') }}"/>
-      </div>
-      <div class="col-sm-2">
-        <label class="form-label small fw-semibold mb-1">Группа</label>
-        <input name="group" type="number" class="form-control form-control-sm" placeholder="3341" value="{{ params.get('group','') }}"/>
-      </div>
-      <div class="col-sm-auto">
-        <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-search me-1"></i>Найти</button>
-        <a href="/students/" class="btn btn-outline-secondary btn-sm ms-1"><i class="bi bi-x"></i> Сбросить</a>
-      </div>
-    </form>
+  <div class="card-header fw-bold bg-light d-flex align-items-center">
+    <i class="bi bi-funnel me-2"></i>Поиск по студентам
+    <button class="btn btn-link btn-sm ms-auto p-0 text-muted" type="button"
+            data-bs-toggle="collapse" data-bs-target="#filterBody">
+      <i class="bi bi-chevron-down"></i>
+    </button>
+  </div>
+  <div class="collapse show" id="filterBody">
+    <div class="card-body py-3">
+      <form method="get" action="/students/">
+        <div class="row g-2">
+          <div class="col-sm-4 col-md-2">
+            <label class="form-label small fw-semibold mb-1">Имя</label>
+            <input name="name" type="text" class="form-control form-control-sm"
+                   placeholder="подстрока..." value="{{ params.get('name','') }}"/>
+          </div>
+          <div class="col-sm-4 col-md-2">
+            <label class="form-label small fw-semibold mb-1">Фамилия</label>
+            <input name="surname" type="text" class="form-control form-control-sm"
+                   placeholder="подстрока..." value="{{ params.get('surname','') }}"/>
+          </div>
+          <div class="col-sm-4 col-md-2">
+            <label class="form-label small fw-semibold mb-1">Группа</label>
+            <input name="group" type="number" class="form-control form-control-sm"
+                   placeholder="3341" value="{{ params.get('group','') }}"/>
+          </div>
+          <div class="col-sm-3 col-md-1">
+            <label class="form-label small fw-semibold mb-1">Отчётов мин.</label>
+            <input name="min_reports" type="number" min="0" class="form-control form-control-sm"
+                   placeholder="0" value="{{ params.get('min_reports','') }}"/>
+          </div>
+          <div class="col-sm-3 col-md-1">
+            <label class="form-label small fw-semibold mb-1">Отчётов макс.</label>
+            <input name="max_reports" type="number" min="0" class="form-control form-control-sm"
+                   placeholder="∞" value="{{ params.get('max_reports','') }}"/>
+          </div>
+        </div>
+
+        <div class="row g-2 mt-1">
+          <div class="col-sm-6 col-md-3">
+            <label class="form-label small fw-semibold mb-1">Последняя загрузка с</label>
+            <input name="last_upload_from" type="datetime-local" class="form-control form-control-sm"
+                   value="{{ params.get('last_upload_from','') }}"/>
+          </div>
+          <div class="col-sm-6 col-md-3">
+            <label class="form-label small fw-semibold mb-1">Последняя загрузка по</label>
+            <input name="last_upload_to" type="datetime-local" class="form-control form-control-sm"
+                   value="{{ params.get('last_upload_to','') }}"/>
+          </div>
+          <div class="col-sm-6 col-md-3">
+            <label class="form-label small fw-semibold mb-1">Зарегистрирован с</label>
+            <input name="created_from" type="datetime-local" class="form-control form-control-sm"
+                   value="{{ params.get('created_from','') }}"/>
+          </div>
+          <div class="col-sm-6 col-md-3">
+            <label class="form-label small fw-semibold mb-1">Зарегистрирован по</label>
+            <input name="created_to" type="datetime-local" class="form-control form-control-sm"
+                   value="{{ params.get('created_to','') }}"/>
+          </div>
+        </div>
+
+        <div class="row g-2 mt-1">
+          <div class="col-sm-6 col-md-3">
+            <label class="form-label small fw-semibold mb-1">Обновлён с</label>
+            <input name="updated_from" type="datetime-local" class="form-control form-control-sm"
+                   value="{{ params.get('updated_from','') }}"/>
+          </div>
+          <div class="col-sm-6 col-md-3">
+            <label class="form-label small fw-semibold mb-1">Обновлён по</label>
+            <input name="updated_to" type="datetime-local" class="form-control form-control-sm"
+                   value="{{ params.get('updated_to','') }}"/>
+          </div>
+          <div class="col-sm-auto d-flex align-items-end gap-2">
+            <button type="submit" class="btn btn-primary btn-sm">
+              <i class="bi bi-search me-1"></i>Найти
+            </button>
+            <a href="/students/" class="btn btn-outline-secondary btn-sm">
+              <i class="bi bi-x me-1"></i>Сбросить
+            </a>
+          </div>
+        </div>
+      </form>
+    </div>
   </div>
 </div>
 
@@ -63,13 +126,18 @@
           <td class="text-end">
             <a href="/students/{{ s.id }}" class="btn btn-sm btn-outline-primary me-1"><i class="bi bi-eye"></i></a>
             <a href="/students/{{ s.id }}/edit" class="btn btn-sm btn-outline-warning me-1"><i class="bi bi-pencil"></i></a>
-            <form method="post" action="/students/{{ s.id }}/delete" class="d-inline" onsubmit="return confirm('Удалить студента?')">
+            <form method="post" action="/students/{{ s.id }}/delete" class="d-inline"
+                  onsubmit="return confirm('Удалить студента?')">
               <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
             </form>
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="9" class="text-center py-4 text-muted">Студентов не найдено. <a href="/students/new">Добавить</a></td></tr>
+        <tr>
+          <td colspan="9" class="text-center py-4 text-muted">
+            Студентов не найдено. <a href="/students/new">Добавить</a>
+          </td>
+        </tr>
         {% endfor %}
       </tbody>
     </table>
