@@ -1,3 +1,4 @@
+{% from "macros.html" import group_tags, pagination %}
 {% extends "base.html" %}
 {% block title %}Поиск отчётов{% endblock %}
 
@@ -8,10 +9,10 @@
       <div class="card-header bg-primary text-white fw-bold">
         <i class="bi bi-funnel me-2"></i>Фильтры
       </div>
-      <div class="card-body">
+      <div class="card-body" style="max-height:calc(100vh - 160px);overflow-y:auto">
         <form method="get" action="/search/">
           <div class="mb-2">
-            <label class="form-label small fw-semibold mb-1">Название документа</label>
+            <label class="form-label small fw-semibold mb-1">Название</label>
             <input name="title" type="text" class="form-control form-control-sm" placeholder="подстрока..." value="{{ params.get('title','') }}"/>
           </div>
           <div class="mb-2">
@@ -19,8 +20,16 @@
             <input name="author" type="text" class="form-control form-control-sm" placeholder="подстрока..." value="{{ params.get('author','') }}"/>
           </div>
           <div class="mb-2">
-            <label class="form-label small fw-semibold mb-1">Группа</label>
-            <input name="group" type="number" class="form-control form-control-sm" placeholder="например 3341" value="{{ params.get('group','') }}"/>
+            <label class="form-label small fw-semibold mb-1">Группы</label>
+            <div class="d-flex flex-wrap gap-1">
+              {% for g in all_groups %}
+                <div class="form-check form-check-inline me-0">
+                  <input class="form-check-input" type="checkbox" name="group" value="{{ g }}" id="g{{ g }}"
+                         {% if g in selected_groups %}checked{% endif %}>
+                  <label class="form-check-label badge {% if g in selected_groups %}bg-primary{% else %}bg-light text-dark border{% endif %} fw-normal" for="g{{ g }}">{{ g }}</label>
+                </div>
+              {% endfor %}
+            </div>
           </div>
           <div class="mb-2">
             <label class="form-label small fw-semibold mb-1">Предмет</label>
@@ -57,16 +66,12 @@
               <span><span id="fleshMinV">{{ params.get('min_flesh','0') }}</span>–<span id="fleshMaxV">{{ params.get('max_flesh','100') }}</span></span>
             </label>
             <div class="d-flex gap-1 align-items-center">
-              <span class="small text-muted">Мин</span>
-              <input name="min_flesh" type="range" class="form-range" min="0" max="100"
-                     value="{{ params.get('min_flesh','0') }}"
-                     oninput="document.getElementById('fleshMinV').textContent=this.value"/>
+              <span class="small text-muted" style="width:28px">Мин</span>
+              <input name="min_flesh" type="range" class="form-range" min="0" max="100" value="{{ params.get('min_flesh','0') }}" oninput="document.getElementById('fleshMinV').textContent=this.value"/>
             </div>
             <div class="d-flex gap-1 align-items-center">
-              <span class="small text-muted">Макс</span>
-              <input name="max_flesh" type="range" class="form-range" min="0" max="100"
-                     value="{{ params.get('max_flesh','100') }}"
-                     oninput="document.getElementById('fleshMaxV').textContent=this.value"/>
+              <span class="small text-muted" style="width:28px">Макс</span>
+              <input name="max_flesh" type="range" class="form-range" min="0" max="100" value="{{ params.get('max_flesh','100') }}" oninput="document.getElementById('fleshMaxV').textContent=this.value"/>
             </div>
           </div>
           <div class="mb-3">
@@ -75,16 +80,12 @@
               <span><span id="origMinV">{{ params.get('min_originality','0') }}</span>–<span id="origMaxV">{{ params.get('max_originality','100') }}</span></span>
             </label>
             <div class="d-flex gap-1 align-items-center">
-              <span class="small text-muted">Мин</span>
-              <input name="min_originality" type="range" class="form-range" min="0" max="100"
-                     value="{{ params.get('min_originality','0') }}"
-                     oninput="document.getElementById('origMinV').textContent=this.value"/>
+              <span class="small text-muted" style="width:28px">Мин</span>
+              <input name="min_originality" type="range" class="form-range" min="0" max="100" value="{{ params.get('min_originality','0') }}" oninput="document.getElementById('origMinV').textContent=this.value"/>
             </div>
             <div class="d-flex gap-1 align-items-center">
-              <span class="small text-muted">Макс</span>
-              <input name="max_originality" type="range" class="form-range" min="0" max="100"
-                     value="{{ params.get('max_originality','100') }}"
-                     oninput="document.getElementById('origMaxV').textContent=this.value"/>
+              <span class="small text-muted" style="width:28px">Макс</span>
+              <input name="max_originality" type="range" class="form-range" min="0" max="100" value="{{ params.get('max_originality','100') }}" oninput="document.getElementById('origMaxV').textContent=this.value"/>
             </div>
           </div>
           <div class="d-grid gap-2">
@@ -97,19 +98,25 @@
   </div>
 
   <div class="col-lg-9">
-    <div class="d-flex align-items-center mb-3">
+    <div class="d-flex align-items-center mb-2">
       <h5 class="fw-bold mb-0 me-auto">
         {% if results is not none %}
           <i class="bi bi-list-ul me-2 text-primary"></i>Результаты поиска
-          <span class="badge bg-primary ms-2">{{ results|length }}</span>
         {% else %}
           <i class="bi bi-info-circle me-2 text-muted"></i>Введите параметры и нажмите «Найти»
         {% endif %}
       </h5>
-      {% if results %}
-      <a href="/reports/new" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg me-1"></i>Добавить отчёт</a>
+      {% if results is not none %}
+      <a href="/reports/new" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg me-1"></i>Добавить</a>
       {% endif %}
     </div>
+
+    {% if results is not none %}
+    <div class="small text-muted mb-2">
+      Найдено: <strong>{{ total }}</strong> отчётов
+      {% if total > page_size %} — страница {{ page }} из {{ total_pages }}{% endif %}
+    </div>
+    {% endif %}
 
     {% if results is not none %}
       {% if results %}
@@ -132,7 +139,7 @@
             <tbody>
               {% for r in results %}
               <tr class="clickable-row" data-href="/reports/{{ r.id }}" style="cursor:pointer">
-                <td class="ps-3 text-muted">{{ loop.index }}</td>
+                <td class="ps-3 text-muted">{{ (page - 1) * page_size + loop.index }}</td>
                 <td class="fw-semibold text-truncate" style="max-width:180px" title="{{ r.title }}">{{ r.title }}</td>
                 <td class="small text-muted">{{ r.author }}</td>
                 <td class="small">{{ r.subject }}</td>
@@ -155,7 +162,8 @@
           </table>
         </div>
       </div>
-      {% else %}
+      {{ pagination(page, total_pages, '/search/', params) }}
+      {% elif total == 0 %}
       <div class="text-center py-5 text-muted">
         <i class="bi bi-search" style="font-size:3rem"></i>
         <p class="mt-3">Ничего не найдено по заданным критериям</p>

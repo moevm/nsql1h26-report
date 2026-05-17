@@ -1,31 +1,41 @@
+{% from "macros.html" import group_tags, pagination %}
 {% extends "base.html" %}
 {% block title %}Главная — АнтиПлагиат{% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-center justify-content-between mb-4">
+<div class="d-flex align-items-center justify-content-between mb-3">
   <div>
     <h4 class="mb-0 fw-bold"><i class="bi bi-house me-2 text-primary"></i>Все отчёты</h4>
-    <small class="text-muted">Всего: {{ reports|length }} отчётов в базе</small>
   </div>
   <div class="d-flex gap-2">
     {% if user.role == 'admin' %}
-    <a href="/import" class="btn btn-outline-secondary btn-sm">
-      <i class="bi bi-cloud-upload me-1"></i>Массовый импорт
-    </a>
-    <a href="/export" class="btn btn-outline-secondary btn-sm">
-      <i class="bi bi-download me-1"></i>Массовый экспорт
-    </a>
+    <a href="/import" class="btn btn-outline-secondary btn-sm"><i class="bi bi-cloud-upload me-1"></i>Массовый импорт</a>
+    <a href="/export" class="btn btn-outline-secondary btn-sm"><i class="bi bi-download me-1"></i>Массовый экспорт</a>
     {% endif %}
-    <a href="/statistics/" class="btn btn-outline-info btn-sm">
-      <i class="bi bi-bar-chart me-1"></i>Статистика
-    </a>
-    <a href="/search/" class="btn btn-outline-primary btn-sm">
-      <i class="bi bi-search me-1"></i>Поиск отчётов
-    </a>
-    <a href="/reports/new" class="btn btn-primary btn-sm">
-      <i class="bi bi-plus-lg me-1"></i>Добавить отчёт
-    </a>
+    <a href="/statistics/" class="btn btn-outline-info btn-sm"><i class="bi bi-bar-chart me-1"></i>Статистика</a>
+    <a href="/search/" class="btn btn-outline-primary btn-sm"><i class="bi bi-search me-1"></i>Поиск</a>
+    <a href="/reports/new" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Добавить</a>
   </div>
+</div>
+
+{% if all_groups %}
+<div class="card shadow-sm mb-3">
+  <div class="card-body py-2">
+    <div class="d-flex align-items-center gap-3">
+      <span class="small fw-semibold text-muted">Фильтр по группе:</span>
+      {% set ep = {} %}
+      {{ group_tags(all_groups, selected_groups, ep) }}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="d-flex align-items-center mb-2">
+  <span class="small text-muted me-auto">
+    Найдено: <strong>{{ total }}</strong> отчётов
+    {% if selected_groups %} (группы: {{ selected_groups | join(', ') }}){% endif %}
+    {% if total > page_size %} — страница {{ page }} из {{ total_pages }}{% endif %}
+  </span>
 </div>
 
 <div class="card shadow-sm">
@@ -52,7 +62,7 @@
         <tbody>
           {% for r in reports %}
           <tr class="clickable-row" data-href="/reports/{{ r.id }}" style="cursor:pointer">
-            <td class="ps-3 text-muted">{{ loop.index }}</td>
+            <td class="ps-3 text-muted">{{ (page - 1) * page_size + loop.index }}</td>
             <td class="fw-semibold text-truncate" style="max-width:180px" title="{{ r.title }}">{{ r.title }}</td>
             <td class="text-muted small">{{ r.author }}</td>
             <td class="small">{{ r.subject }}</td>
@@ -70,9 +80,7 @@
                 <span class="fw-semibold {% if orig < 50 %}text-danger{% elif orig < 75 %}text-warning{% else %}text-success{% endif %}">{{ orig }}%</span>
               {% else %}—{% endif %}
             </td>
-            <td class="text-muted small text-truncate" style="max-width:120px" title="{{ r.comment or '' }}">
-              {{ r.comment or '—' }}
-            </td>
+            <td class="text-muted small text-truncate" style="max-width:120px" title="{{ r.comment or '' }}">{{ r.comment or '—' }}</td>
             <td class="small text-muted">{{ r.file_size_str }}</td>
             <td class="small text-muted" style="white-space:nowrap">{{ r.upload_date_str }}</td>
             <td>
@@ -94,6 +102,10 @@
     </div>
   </div>
 </div>
+
+{% set pg_params = {} %}
+{% for g in selected_groups %}{% set _ = pg_params.update({'group': selected_groups}) %}{% endfor %}
+{{ pagination(page, total_pages, '/dashboard', {'group': selected_groups}) }}
 
 <div class="card shadow-sm mt-4">
   <div class="card-body">

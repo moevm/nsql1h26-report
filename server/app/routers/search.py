@@ -1,14 +1,13 @@
 import datetime
-
 from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
-
 from server.app.auth import get_current_user
 from server.app.database import run_query
 
 router = APIRouter(prefix="/search", tags=["search"])
 templates = Jinja2Templates(directory="client/templates")
+PAGE_SIZE = 10
 
 
 @router.get("/")
@@ -17,19 +16,39 @@ async def search_page(request: Request):
     if not user:
         return RedirectResponse(url="/login", status_code=302)
 
+    groups_raw = run_query("MATCH (r:Report) RETURN DISTINCT r.group AS g ORDER BY g")
+    all_groups = [row["g"] for row in groups_raw if row["g"]]
+
     params = dict(request.query_params)
+    selected_groups = [int(g) for g in request.query_params.getlist("group") if g.isdigit()]
+
+    try:
+        page = max(1, int(params.get("page", 1)))
+    except ValueError:
+        page = 1
+
     results = None
+    total = 0
+    total_pages = 1
 
-    if any(params.values()):
-        results = _do_search(params)
+    search_params = {k: v for k, v in params.items() if k not in ("page",)}
+    if any(v for k, v in params.items() if k not in ("page",)) or selected_groups:
+        all_results = _do_search(params, selected_groups)
+        total = len(all_results)
+        total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+        page = min(page, total_pages)
+        start = (page - 1) * PAGE_SIZE
+        results = all_results[start: start + PAGE_SIZE]
 
-    return templates.TemplateResponse(
-        "search.html",
-        {"request": request, "user": user, "params": params, "results": results},
-    )
+    return templates.TemplateResponse("search.html", {
+        "request": request, "user": user, "params": params,
+        "all_groups": all_groups, "selected_groups": selected_groups,
+        "results": results, "total": total,
+        "page": page, "total_pages": total_pages, "page_size": PAGE_SIZE,
+    })
 
 
-def _do_search(params: dict) -> list:
+def _do_search(params: dict, selected_groups: list) -> list:
     conditions = []
     query_params = {}
 
@@ -43,10 +62,9 @@ def _do_search(params: dict) -> list:
         conditions.append("toLower(r.author) CONTAINS toLower($author)")
         query_params["author"] = author
 
-    group = params.get("group", "").strip()
-    if group and group.isdigit():
-        conditions.append("r.group = $group")
-        query_params["group"] = int(group)
+    if selected_groups:
+        conditions.append("r.group IN $groups")
+        query_params["groups"] = selected_groups
 
     subject = params.get("subject", "").strip()
     if subject:
@@ -66,23 +84,23 @@ def _do_search(params: dict) -> list:
     date_from = params.get("date_from", "").strip()
     if date_from:
         try:
-            ts_from = int(datetime.datetime.strptime(date_from, "%Y-%m-%dT%H:%M").timestamp())
+            ts = int(datetime.datetime.strptime(date_from, "%Y-%m-%dT%H:%M").timestamp())
             conditions.append("r.upload_date >= $ts_from")
-            query_params["ts_from"] = ts_from
+            query_params["ts_from"] = ts
         except ValueError:
             pass
 
     date_to = params.get("date_to", "").strip()
     if date_to:
         try:
-            ts_to = int(datetime.datetime.strptime(date_to, "%Y-%m-%dT%H:%M").timestamp())
+            ts = int(datetime.datetime.strptime(date_to, "%Y-%m-%dT%H:%M").timestamp())
             conditions.append("r.upload_date <= $ts_to")
-            query_params["ts_to"] = ts_to
+            query_params["ts_to"] = ts
         except ValueError:
             pass
 
     min_flesh = params.get("min_flesh", "").strip()
-    if min_flesh and min_flesh.isdigit():
+    if min_flesh and min_flesh.isdigit() and int(min_flesh) > 0:
         conditions.append("r.flesh_index >= $min_flesh")
         query_params["min_flesh"] = int(min_flesh)
 
@@ -91,20 +109,20 @@ def _do_search(params: dict) -> list:
         conditions.append("r.flesh_index <= $max_flesh")
         query_params["max_flesh"] = int(max_flesh)
 
-    min_originality = params.get("min_originality", "").strip()
-    if min_originality:
+    min_orig = params.get("min_originality", "").strip()
+    if min_orig:
         try:
-            v = float(min_originality)
+            v = float(min_orig)
             if v > 0:
                 conditions.append("r.originality >= $min_orig")
                 query_params["min_orig"] = v
         except ValueError:
             pass
 
-    max_originality = params.get("max_originality", "").strip()
-    if max_originality:
+    max_orig = params.get("max_originality", "").strip()
+    if max_orig:
         try:
-            v = float(max_originality)
+            v = float(max_orig)
             if v < 100:
                 conditions.append("r.originality <= $max_orig")
                 query_params["max_orig"] = v
@@ -113,10 +131,10 @@ def _do_search(params: dict) -> list:
 
     word = params.get("word", "").strip()
     if word:
-        base_query = f"""
+        and_part = "AND " + " AND ".join(conditions) if conditions else ""
+        q = f"""
         MATCH (r:Report)-[:HAS_PART]->(:Part)-[:CONTAINS]->(c:Chunk)
-        WHERE toLower(c.text) CONTAINS toLower($word)
-        {"AND " + " AND ".join(conditions) if conditions else ""}
+        WHERE toLower(c.text) CONTAINS toLower($word) {and_part}
         WITH DISTINCT r
         RETURN r.id AS id, r.title AS title, r.author AS author,
                r.group AS group, r.subject AS subject, r.status AS status,
@@ -126,10 +144,9 @@ def _do_search(params: dict) -> list:
         """
         query_params["word"] = word
     else:
-        where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
-        base_query = f"""
-        MATCH (r:Report)
-        {where_clause}
+        where = "WHERE " + " AND ".join(conditions) if conditions else ""
+        q = f"""
+        MATCH (r:Report) {where}
         RETURN r.id AS id, r.title AS title, r.author AS author,
                r.group AS group, r.subject AS subject, r.status AS status,
                r.words_count AS words_count, r.flesh_index AS flesh_index,
@@ -137,10 +154,8 @@ def _do_search(params: dict) -> list:
         ORDER BY r.title
         """
 
-    rows = run_query(base_query, query_params)
-
+    rows = run_query(q, query_params)
     for r in rows:
         ts = r.get("upload_date")
         r["upload_date_str"] = datetime.datetime.fromtimestamp(ts).strftime("%d.%m.%Y %H:%M") if ts else "—"
-
     return rows

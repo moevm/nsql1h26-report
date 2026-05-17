@@ -3,12 +3,12 @@ import datetime
 from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
-
 from server.app.auth import get_current_user
 from server.app.database import run_query, run_write
 
 router = APIRouter(prefix="/students", tags=["students"])
 templates = Jinja2Templates(directory="client/templates")
+PAGE_SIZE = 20
 
 
 def _next_id() -> int:
@@ -23,7 +23,7 @@ def _fmt_ts(ts):
     return datetime.datetime.fromtimestamp(ts).strftime("%d.%m.%Y %H:%M")
 
 
-def _parse_dt(value: str) -> int | None:
+def _parse_dt(value: str):
     if not value:
         return None
     try:
@@ -38,82 +38,104 @@ async def students_list(request: Request):
     if not user:
         return RedirectResponse(url="/login", status_code=302)
 
-    params = dict(request.query_params)
+    groups_raw = run_query("MATCH (s:Student) RETURN DISTINCT s.group AS g ORDER BY g")
+    all_groups = [row["g"] for row in groups_raw if row["g"]]
 
-    having_conditions = []
-    where_conditions = []
-    query_params = {}
+    params = dict(request.query_params)
+    selected_groups = [int(g) for g in request.query_params.getlist("group") if g.isdigit()]
+
+    try:
+        page = max(1, int(params.get("page", 1)))
+    except ValueError:
+        page = 1
+
+    where_conds = []
+    having_conds = []
+    q_params = {}
 
     name = params.get("name", "").strip()
     if name:
-        where_conditions.append("toLower(s.name) CONTAINS toLower($name)")
-        query_params["name"] = name
+        where_conds.append("toLower(s.name) CONTAINS toLower($name)")
+        q_params["name"] = name
 
     surname = params.get("surname", "").strip()
     if surname:
-        where_conditions.append("toLower(s.surname) CONTAINS toLower($surname)")
-        query_params["surname"] = surname
+        where_conds.append("toLower(s.surname) CONTAINS toLower($surname)")
+        q_params["surname"] = surname
 
-    group = params.get("group", "").strip()
-    if group and group.isdigit():
-        where_conditions.append("s.group = $group")
-        query_params["group"] = int(group)
+    if selected_groups:
+        where_conds.append("s.group IN $groups")
+        q_params["groups"] = selected_groups
 
     min_reports = params.get("min_reports", "").strip()
     if min_reports and min_reports.isdigit():
-        having_conditions.append("report_count >= $min_reports")
-        query_params["min_reports"] = int(min_reports)
+        having_conds.append("report_count >= $min_reports")
+        q_params["min_reports"] = int(min_reports)
 
     max_reports = params.get("max_reports", "").strip()
     if max_reports and max_reports.isdigit():
-        having_conditions.append("report_count <= $max_reports")
-        query_params["max_reports"] = int(max_reports)
+        having_conds.append("report_count <= $max_reports")
+        q_params["max_reports"] = int(max_reports)
 
-    last_upload_from = _parse_dt(params.get("last_upload_from", ""))
-    if last_upload_from is not None:
-        having_conditions.append("last_upload >= $last_upload_from")
-        query_params["last_upload_from"] = last_upload_from
+    ts = _parse_dt(params.get("last_upload_from", ""))
+    if ts is not None:
+        having_conds.append("last_upload >= $lu_from")
+        q_params["lu_from"] = ts
 
-    last_upload_to = _parse_dt(params.get("last_upload_to", ""))
-    if last_upload_to is not None:
-        having_conditions.append("last_upload <= $last_upload_to")
-        query_params["last_upload_to"] = last_upload_to
+    ts = _parse_dt(params.get("last_upload_to", ""))
+    if ts is not None:
+        having_conds.append("last_upload <= $lu_to")
+        q_params["lu_to"] = ts
 
-    created_from = _parse_dt(params.get("created_from", ""))
-    if created_from is not None:
-        where_conditions.append("s.created_at >= $created_from")
-        query_params["created_from"] = created_from
+    ts = _parse_dt(params.get("created_from", ""))
+    if ts is not None:
+        where_conds.append("s.created_at >= $cr_from")
+        q_params["cr_from"] = ts
 
-    created_to = _parse_dt(params.get("created_to", ""))
-    if created_to is not None:
-        where_conditions.append("s.created_at <= $created_to")
-        query_params["created_to"] = created_to
+    ts = _parse_dt(params.get("created_to", ""))
+    if ts is not None:
+        where_conds.append("s.created_at <= $cr_to")
+        q_params["cr_to"] = ts
 
-    updated_from = _parse_dt(params.get("updated_from", ""))
-    if updated_from is not None:
-        where_conditions.append("s.updated_at >= $updated_from")
-        query_params["updated_from"] = updated_from
+    ts = _parse_dt(params.get("updated_from", ""))
+    if ts is not None:
+        where_conds.append("s.updated_at >= $up_from")
+        q_params["up_from"] = ts
 
-    updated_to = _parse_dt(params.get("updated_to", ""))
-    if updated_to is not None:
-        where_conditions.append("s.updated_at <= $updated_to")
-        query_params["updated_to"] = updated_to
+    ts = _parse_dt(params.get("updated_to", ""))
+    if ts is not None:
+        where_conds.append("s.updated_at <= $up_to")
+        q_params["up_to"] = ts
 
-    where_clause = "WHERE " + " AND ".join(where_conditions) if where_conditions else ""
-    having_clause = "WHERE " + " AND ".join(having_conditions) if having_conditions else ""
+    where_clause = "WHERE " + " AND ".join(where_conds) if where_conds else ""
+    having_clause = "WHERE " + " AND ".join(having_conds) if having_conds else ""
+
+    count_res = run_query(
+        f"""
+        MATCH (s:Student) {where_clause}
+        OPTIONAL MATCH (s)-[:SUBMITTED]->(r:Report)
+        WITH s, count(r) AS report_count, max(r.upload_date) AS last_upload
+        {having_clause}
+        RETURN count(s) AS cnt
+        """,
+        q_params,
+    )
+    total = count_res[0]["cnt"] if count_res else 0
+    total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+    page = min(page, total_pages)
 
     students = run_query(
         f"""
-        MATCH (s:Student)
-        {where_clause}
+        MATCH (s:Student) {where_clause}
         OPTIONAL MATCH (s)-[:SUBMITTED]->(r:Report)
         WITH s, count(r) AS report_count, max(r.upload_date) AS last_upload
         {having_clause}
         RETURN s.id AS id, s.name AS name, s.surname AS surname, s.group AS group,
                report_count, last_upload, s.created_at AS created_at, s.updated_at AS updated_at
         ORDER BY s.surname
+        SKIP $skip LIMIT $limit
         """,
-        query_params,
+        {**q_params, "skip": (page - 1) * PAGE_SIZE, "limit": PAGE_SIZE},
     )
 
     for s in students:
@@ -121,10 +143,11 @@ async def students_list(request: Request):
         s["updated_at_str"] = _fmt_ts(s.get("updated_at"))
         s["last_upload_str"] = _fmt_ts(s.get("last_upload"))
 
-    return templates.TemplateResponse(
-        "students.html",
-        {"request": request, "user": user, "students": students, "params": params},
-    )
+    return templates.TemplateResponse("students.html", {
+        "request": request, "user": user, "students": students, "params": params,
+        "all_groups": all_groups, "selected_groups": selected_groups,
+        "total": total, "page": page, "total_pages": total_pages, "page_size": PAGE_SIZE,
+    })
 
 
 @router.get("/new")
@@ -136,12 +159,7 @@ async def new_student_page(request: Request):
 
 
 @router.post("/new")
-async def create_student(
-    request: Request,
-    name: str = Form(...),
-    surname: str = Form(...),
-    group: int = Form(...),
-):
+async def create_student(request: Request, name: str = Form(...), surname: str = Form(...), group: int = Form(...)):
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=302)
@@ -177,17 +195,13 @@ async def student_detail(request: Request, student_id: int):
         """,
         {"id": student_id},
     )
-
     for r in reports:
         r["upload_date_str"] = _fmt_ts(r.get("upload_date"))
 
     last_upload = max((r["upload_date"] for r in reports if r.get("upload_date")), default=None)
     s["last_upload_str"] = _fmt_ts(last_upload)
 
-    return templates.TemplateResponse(
-        "student_detail.html",
-        {"request": request, "user": user, "student": s, "reports": reports},
-    )
+    return templates.TemplateResponse("student_detail.html", {"request": request, "user": user, "student": s, "reports": reports})
 
 
 @router.get("/{student_id}/edit")
@@ -203,13 +217,7 @@ async def edit_student_page(request: Request, student_id: int):
 
 
 @router.post("/{student_id}/edit")
-async def edit_student_submit(
-    request: Request,
-    student_id: int,
-    name: str = Form(...),
-    surname: str = Form(...),
-    group: int = Form(...),
-):
+async def edit_student_submit(request: Request, student_id: int, name: str = Form(...), surname: str = Form(...), group: int = Form(...)):
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=302)

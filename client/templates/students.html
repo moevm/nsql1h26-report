@@ -1,10 +1,10 @@
+{% from "macros.html" import pagination %}
 {% extends "base.html" %}
 {% block title %}Студенты{% endblock %}
 {% block content %}
 <div class="d-flex align-items-center mb-4">
   <div class="me-auto">
     <h5 class="mb-0 fw-bold"><i class="bi bi-people me-2 text-primary"></i>Студенты</h5>
-    <small class="text-muted">{{ students|length }} студентов найдено</small>
   </div>
   <a href="/students/new" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Добавить студента</a>
 </div>
@@ -23,77 +23,74 @@
         <div class="row g-2">
           <div class="col-sm-4 col-md-2">
             <label class="form-label small fw-semibold mb-1">Имя</label>
-            <input name="name" type="text" class="form-control form-control-sm"
-                   placeholder="подстрока..." value="{{ params.get('name','') }}"/>
+            <input name="name" type="text" class="form-control form-control-sm" placeholder="подстрока..." value="{{ params.get('name','') }}"/>
           </div>
           <div class="col-sm-4 col-md-2">
             <label class="form-label small fw-semibold mb-1">Фамилия</label>
-            <input name="surname" type="text" class="form-control form-control-sm"
-                   placeholder="подстрока..." value="{{ params.get('surname','') }}"/>
+            <input name="surname" type="text" class="form-control form-control-sm" placeholder="подстрока..." value="{{ params.get('surname','') }}"/>
           </div>
-          <div class="col-sm-4 col-md-2">
-            <label class="form-label small fw-semibold mb-1">Группа</label>
-            <input name="group" type="number" class="form-control form-control-sm"
-                   placeholder="3341" value="{{ params.get('group','') }}"/>
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold mb-1">Группы</label>
+            <div class="d-flex flex-wrap gap-1">
+              {% for g in all_groups %}
+                <div class="form-check form-check-inline me-0">
+                  <input class="form-check-input" type="checkbox" name="group" value="{{ g }}" id="sg{{ g }}"
+                         {% if g in selected_groups %}checked{% endif %}>
+                  <label class="form-check-label badge {% if g in selected_groups %}bg-primary{% else %}bg-light text-dark border{% endif %} fw-normal" for="sg{{ g }}">{{ g }}</label>
+                </div>
+              {% endfor %}
+            </div>
           </div>
-          <div class="col-sm-3 col-md-1">
+          <div class="col-sm-3 col-md-2">
             <label class="form-label small fw-semibold mb-1">Отчётов мин.</label>
-            <input name="min_reports" type="number" min="0" class="form-control form-control-sm"
-                   placeholder="0" value="{{ params.get('min_reports','') }}"/>
+            <input name="min_reports" type="number" min="0" class="form-control form-control-sm" placeholder="0" value="{{ params.get('min_reports','') }}"/>
           </div>
-          <div class="col-sm-3 col-md-1">
+          <div class="col-sm-3 col-md-2">
             <label class="form-label small fw-semibold mb-1">Отчётов макс.</label>
-            <input name="max_reports" type="number" min="0" class="form-control form-control-sm"
-                   placeholder="∞" value="{{ params.get('max_reports','') }}"/>
+            <input name="max_reports" type="number" min="0" class="form-control form-control-sm" placeholder="∞" value="{{ params.get('max_reports','') }}"/>
           </div>
         </div>
-
         <div class="row g-2 mt-1">
           <div class="col-sm-6 col-md-3">
             <label class="form-label small fw-semibold mb-1">Последняя загрузка с</label>
-            <input name="last_upload_from" type="datetime-local" class="form-control form-control-sm"
-                   value="{{ params.get('last_upload_from','') }}"/>
+            <input name="last_upload_from" type="datetime-local" class="form-control form-control-sm" value="{{ params.get('last_upload_from','') }}"/>
           </div>
           <div class="col-sm-6 col-md-3">
             <label class="form-label small fw-semibold mb-1">Последняя загрузка по</label>
-            <input name="last_upload_to" type="datetime-local" class="form-control form-control-sm"
-                   value="{{ params.get('last_upload_to','') }}"/>
+            <input name="last_upload_to" type="datetime-local" class="form-control form-control-sm" value="{{ params.get('last_upload_to','') }}"/>
           </div>
           <div class="col-sm-6 col-md-3">
             <label class="form-label small fw-semibold mb-1">Зарегистрирован с</label>
-            <input name="created_from" type="datetime-local" class="form-control form-control-sm"
-                   value="{{ params.get('created_from','') }}"/>
+            <input name="created_from" type="datetime-local" class="form-control form-control-sm" value="{{ params.get('created_from','') }}"/>
           </div>
           <div class="col-sm-6 col-md-3">
             <label class="form-label small fw-semibold mb-1">Зарегистрирован по</label>
-            <input name="created_to" type="datetime-local" class="form-control form-control-sm"
-                   value="{{ params.get('created_to','') }}"/>
+            <input name="created_to" type="datetime-local" class="form-control form-control-sm" value="{{ params.get('created_to','') }}"/>
           </div>
         </div>
-
         <div class="row g-2 mt-1">
           <div class="col-sm-6 col-md-3">
             <label class="form-label small fw-semibold mb-1">Обновлён с</label>
-            <input name="updated_from" type="datetime-local" class="form-control form-control-sm"
-                   value="{{ params.get('updated_from','') }}"/>
+            <input name="updated_from" type="datetime-local" class="form-control form-control-sm" value="{{ params.get('updated_from','') }}"/>
           </div>
           <div class="col-sm-6 col-md-3">
             <label class="form-label small fw-semibold mb-1">Обновлён по</label>
-            <input name="updated_to" type="datetime-local" class="form-control form-control-sm"
-                   value="{{ params.get('updated_to','') }}"/>
+            <input name="updated_to" type="datetime-local" class="form-control form-control-sm" value="{{ params.get('updated_to','') }}"/>
           </div>
           <div class="col-sm-auto d-flex align-items-end gap-2">
-            <button type="submit" class="btn btn-primary btn-sm">
-              <i class="bi bi-search me-1"></i>Найти
-            </button>
-            <a href="/students/" class="btn btn-outline-secondary btn-sm">
-              <i class="bi bi-x me-1"></i>Сбросить
-            </a>
+            <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-search me-1"></i>Найти</button>
+            <a href="/students/" class="btn btn-outline-secondary btn-sm"><i class="bi bi-x me-1"></i>Сбросить</a>
           </div>
         </div>
       </form>
     </div>
   </div>
+</div>
+
+<div class="small text-muted mb-2">
+  Найдено: <strong>{{ total }}</strong> студентов
+  {% if selected_groups %} (группы: {{ selected_groups | join(', ') }}){% endif %}
+  {% if total > page_size %} — страница {{ page }} из {{ total_pages }}{% endif %}
 </div>
 
 <div class="card shadow-sm">
@@ -126,21 +123,20 @@
           <td class="text-end">
             <a href="/students/{{ s.id }}" class="btn btn-sm btn-outline-primary me-1"><i class="bi bi-eye"></i></a>
             <a href="/students/{{ s.id }}/edit" class="btn btn-sm btn-outline-warning me-1"><i class="bi bi-pencil"></i></a>
-            <form method="post" action="/students/{{ s.id }}/delete" class="d-inline"
-                  onsubmit="return confirm('Удалить студента?')">
+            <form method="post" action="/students/{{ s.id }}/delete" class="d-inline" onsubmit="return confirm('Удалить студента?')">
               <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
             </form>
           </td>
         </tr>
         {% else %}
         <tr>
-          <td colspan="9" class="text-center py-4 text-muted">
-            Студентов не найдено. <a href="/students/new">Добавить</a>
-          </td>
+          <td colspan="9" class="text-center py-4 text-muted">Студентов не найдено. <a href="/students/new">Добавить</a></td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
+
+{{ pagination(page, total_pages, '/students/', params) }}
 {% endblock %}
