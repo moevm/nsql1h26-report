@@ -7,7 +7,7 @@ from server.app.database import run_query
 
 router = APIRouter(tags=["dashboard"])
 templates = Jinja2Templates(directory="client/templates")
-PAGE_SIZE = 20
+PAGE_SIZE = 5
 
 
 def _fmt_size(b):

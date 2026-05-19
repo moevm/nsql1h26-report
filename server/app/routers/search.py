@@ -7,7 +7,7 @@ from server.app.database import run_query
 
 router = APIRouter(prefix="/search", tags=["search"])
 templates = Jinja2Templates(directory="client/templates")
-PAGE_SIZE = 10
+PAGE_SIZE = 5
 
 
 @router.get("/")

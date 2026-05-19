@@ -8,7 +8,7 @@ from server.app.database import run_query, run_write
 
 router = APIRouter(prefix="/students", tags=["students"])
 templates = Jinja2Templates(directory="client/templates")
-PAGE_SIZE = 20
+PAGE_SIZE = 5
 
 
 def _next_id() -> int:
