@@ -2,7 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from server.app.database import wait_for_neo4j, init_db
@@ -37,4 +37,18 @@ app.include_router(statistics.router)
 
 @app.get("/")
 async def root():
-    return RedirectResponse(url="/dashboard", status_code=302)
+    html_content = """
+    <!DOCTYPE html>
+    <html>
+        <head>
+            <meta http-equiv="refresh" content="0; url=/dashboard" />
+            <script type="text/javascript">
+                window.location.href = "/dashboard";
+            </script>
+        </head>
+        <body>
+            <p>Перенаправление на <a href="/dashboard">/dashboard</a>...</p>
+        </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content, status_code=200)
